@@ -23,7 +23,14 @@ extern "C" {
  * @param bytes Pointer to a 4-byte array.
  * @return A 64-bit value representing the converted 32-bit unsigned integer.
  */
-uint64_t bytes_to_uint32(uint8_t *bytes);
+uint32_t bytes_to_uint32(uint8_t *bytes);
+
+/**
+ * @brief Convert a 4-byte array into a 32-bit unsigned integer (big-endian).
+ * @param bytes Pointer to a 4-byte array.
+ * @return A 64-bit value representing the converted 32-bit unsigned integer.
+ */
+uint64_t bytes_to_uint64(uint8_t *bytes);
 
 /**
  * @brief Combine two bytes (high and low) into a 16-bit unsigned integer.

@@ -61,8 +61,8 @@ all: main-build
 main-build: STM32_Ford_Superduty_CAN_Bus_Gateway.elf secondary-outputs
 
 # Tool invocations
-STM32_Ford_Superduty_CAN_Bus_Gateway.elf STM32_Ford_Superduty_CAN_Bus_Gateway.map: $(OBJS) $(USER_OBJS) E:\STM32_Ford_Superduty_CAN_Bus_Gateway\STM32F446RETX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
-	arm-none-eabi-gcc -o "STM32_Ford_Superduty_CAN_Bus_Gateway.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"E:\STM32_Ford_Superduty_CAN_Bus_Gateway\STM32F446RETX_FLASH.ld" --specs=nosys.specs -Wl,-Map="STM32_Ford_Superduty_CAN_Bus_Gateway.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
+STM32_Ford_Superduty_CAN_Bus_Gateway.elf STM32_Ford_Superduty_CAN_Bus_Gateway.map: $(OBJS) $(USER_OBJS) /Users/rclements/stm32_ford_superduty_can_bus_gateway/STM32F446RETX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
+	arm-none-eabi-gcc -o "STM32_Ford_Superduty_CAN_Bus_Gateway.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"/Users/rclements/stm32_ford_superduty_can_bus_gateway/STM32F446RETX_FLASH.ld" --specs=nosys.specs -Wl,-Map="STM32_Ford_Superduty_CAN_Bus_Gateway.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
 	@echo 'Finished building target: $@'
 	@echo ' '
 

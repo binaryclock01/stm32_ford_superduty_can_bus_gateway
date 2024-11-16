@@ -37,9 +37,9 @@ static inline uint32_t get_request_id(CAN_IDs module_id) {
 }
 
 typedef enum {
-    UINT8_LENGTH_MASK  = 0xFF00000000000000,
-    UINT8_COMMAND_MASK = 0x00FF000000000000,
-    UINT16_PID_MASK    = 0x0000FFFF00000000,
+    UINT64_LENGTH_MASK  = 0xFF00000000000000,
+    UINT64_COMMAND_MASK = 0x00FF000000000000,
+    UINT64_PID_MASK     = 0x0000FFFF00000000,
 } CANMasks;
 
 /* -----------------------------------------------------------------------------

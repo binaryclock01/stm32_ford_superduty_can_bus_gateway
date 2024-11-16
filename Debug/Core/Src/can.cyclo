@@ -5,4 +5,4 @@
 ../Core/Src/can.c:124:18:get_CANDeviceConfig_by_canid	3
 ../Core/Src/can.c:143:15:get_CANDevicePID_by_pid	3
 ../Core/Src/can.c:163:6:iterate_signals_for_changes	6
-../Core/Src/can.c:192:6:parse_rx_CAN_message	5
+../Core/Src/can.c:192:6:parse_rx_CAN_message	7

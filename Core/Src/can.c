@@ -200,8 +200,8 @@ void parse_rx_CAN_message(uint32_t RAW_rx_id, uint8_t *RAW_rx_data_as_byte_array
         return;
     }
 
-    uint32_t data = bytes_to_uint32(RAW_rx_data_as_byte_array);
-    uint16_t rx_pid = data & UINT16_PID_MASK;
+    uint64_t data = bytes_to_uint64(RAW_rx_data_as_byte_array);
+    uint16_t rx_pid = (uint16_t)(((uint64_t)data & UINT64_PID_MASK) >> 32);
     CANDevicePID *selected_pid = get_CANDevicePID_by_pid(selected_can_device, rx_pid);
 
     if (selected_pid == NULL) {
@@ -209,14 +209,21 @@ void parse_rx_CAN_message(uint32_t RAW_rx_id, uint8_t *RAW_rx_data_as_byte_array
         return;
     }
 
-    uint8_t rx_data_length = data & UINT8_LENGTH_MASK;
+
+    uint8_t rx_data_length = (uint8_t)(((uint64_t)data & UINT64_LENGTH_MASK) >> 56);
     uint32_t rx_payload = 0;
 
-    if (!IN_RANGE(rx_data_length, 0, MAX_PAYLOAD_LENGTH)) {
+    if (!IN_RANGE(rx_data_length, 0, 8)) {
         send_Console_Msg("Er data len out of range");
         Error_Handler();
     }
 
-    memcpy(&rx_payload, ((uint8_t *)&data) + DATA_PAYLOAD_START, rx_data_length);
+    memcpy(&rx_payload, ((uint8_t *)&data), rx_data_length);
+
+    if ((rx_pid == 0x2B00) && (rx_payload == 0x60000000))
+       {
+       	int i = 1;
+
+       }
     iterate_signals_for_changes(selected_pid, rx_payload);
 }
