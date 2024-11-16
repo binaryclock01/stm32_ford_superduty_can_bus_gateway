@@ -17,12 +17,13 @@
   */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
-#include <device_configs.h>	// Include the configurations for devices
+
 #include "main.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 
+#include <device_configs.h>	// Include the configurations for devices
 #include <string.h>  // For memcpy
 #include <stdio.h> // for printf
 #include <stdbool.h> // for boolean support in c
@@ -30,7 +31,6 @@
 #include "ssd1306_fonts.h"
 #include "ui.h"
 #include "can.h"
-
 
 /* USER CODE END Includes */
 
@@ -268,7 +268,13 @@ static void MX_CAN1_Init(void)
   /* USER CODE END CAN1_Init 1 */
   hcan1.Instance = CAN1;
   hcan1.Init.Prescaler = 18;
+
+#ifdef LOOPBACK_MODE
+  hcan1.Init.Mode = CAN_MODE_LOOPBACK;
+#else
   hcan1.Init.Mode = CAN_MODE_NORMAL;
+#endif
+
   hcan1.Init.SyncJumpWidth = CAN_SJW_1TQ;
   hcan1.Init.TimeSeg1 = CAN_BS1_2TQ;
   hcan1.Init.TimeSeg2 = CAN_BS2_2TQ;

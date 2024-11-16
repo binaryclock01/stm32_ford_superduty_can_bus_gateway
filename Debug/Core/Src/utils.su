@@ -1,4 +1,0 @@
-../Core/Src/utils.c:11:10:bytes_to_uint32	24	static
-../Core/Src/utils.c:16:10:bytes_to_uint64	48	static
-../Core/Src/utils.c:25:10:bytes_to_uint16	16	static
-../Core/Src/utils.c:29:5:tobinary	16	static

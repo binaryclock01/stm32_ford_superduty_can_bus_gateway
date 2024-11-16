@@ -103,6 +103,11 @@ void send_can_request(CANInstance can_instance, CANDeviceConfig *device, CANDevi
  * Iterates through all configured devices and PIDs to send CAN requests.
  */
 void send_all_can_requests(void) {
+
+#ifdef LOOPBACK_MODE
+	// Send BCM Brake Pedal for test in loopback mode
+	send_can_request(CAN_TRUCK, &can_devices[0], &(can_devices[0].pids[1]));
+#else
     for (uint8_t device_index = 0; device_index < CAN_DEVICE_COUNT; device_index++) {
         CANDeviceConfig *device = &can_devices[device_index];
 
@@ -111,6 +116,7 @@ void send_all_can_requests(void) {
             send_can_request(CAN_TRUCK, device, pid);
         }
     }
+#endif
 }
 
 /**
@@ -144,7 +150,10 @@ CANDevicePID *get_CANDevicePID_by_pid(CANDeviceConfig *module, uint16_t pid) {
     for (uint8_t pid_idx = 0; pid_idx < module->pid_count; pid_idx++) {
         CANDevicePID *device_pid = &module->pids[pid_idx];
         uint16_t module_pid = 0;
-        memcpy(&module_pid, ((uint8_t *)&pid), PID_BYTE_LENGTH);
+        for (int i = 0; i < PID_BYTE_LENGTH; i++)
+        {
+            module_pid |= ((uint16_t)(device_pid->pid_id[i])) << (8 * (1 - i));
+        }
         if (module_pid == pid) {
             return device_pid;
         }
@@ -161,7 +170,7 @@ CANDevicePID *get_CANDevicePID_by_pid(CANDeviceConfig *module, uint16_t pid) {
  * @param payload The received payload data to compare against.
  */
 void iterate_signals_for_changes(CANDevicePID *device_pid, uint32_t payload) {
-    for (uint8_t signal_idx = 0; signal_idx < sizeof(device_pid->signals) / sizeof(device_pid->signals[0]); signal_idx++) {
+    for (uint8_t signal_idx = 0; signal_idx < device_pid->num_of_signals; signal_idx++) {
         CANSignal *signal = &device_pid->signals[signal_idx];
 
         switch (signal->change_type) {
@@ -190,40 +199,44 @@ void iterate_signals_for_changes(CANDevicePID *device_pid, uint32_t payload) {
  * @param RAW_rx_data_as_byte_array The received CAN data as a byte array.
  */
 void parse_rx_CAN_message(uint32_t RAW_rx_id, uint8_t *RAW_rx_data_as_byte_array) {
+    // Ignore heartbeat messages
     if (RAW_rx_id == CAN_ID_HEARTBEAT) {
         return;
     }
 
+#ifdef LOOPBACK_MODE
+    RAW_rx_id += 8;
+    RAW_rx_data_as_byte_array[5] = 0x60;
+#endif
+
+    // Get CAN device configuration
     CANDeviceConfig *selected_can_device = get_CANDeviceConfig_by_canid(RAW_rx_id);
-    if (selected_can_device == NULL) {
+    if (!selected_can_device) {
         User_Error_Handler(ERROR_CAN_MODULE_NOT_FOUND);
         return;
     }
 
-    uint64_t data = bytes_to_uint64(RAW_rx_data_as_byte_array);
-    uint16_t rx_pid = (uint16_t)(((uint64_t)data & UINT64_PID_MASK) >> 32);
-    CANDevicePID *selected_pid = get_CANDevicePID_by_pid(selected_can_device, rx_pid);
+    // Extract fields from the message
+    uint64_t data = 0;
+    bytes_to_big_endian(&data, RAW_rx_data_as_byte_array, 8);  // Convert to big-endian
 
-    if (selected_pid == NULL) {
+    uint8_t rx_data_length = (data >> 56) & 0xFF;  // Extract data length (highest byte)
+    uint16_t rx_pid = (data >> 40) & 0xFFFF;      // Extract PID (next 2 bytes)
+    uint32_t rx_payload = data & 0xFFFFFFFF;      // Extract payload (lowest 4 bytes)
+
+    // Validate data length
+    if (rx_data_length < 4 || rx_data_length > 8) {
+        send_Console_Msg("Err: Data length out of range");
+        Error_Handler();
+    }
+
+    // Get the PID configuration
+    CANDevicePID *selected_pid = get_CANDevicePID_by_pid(selected_can_device, rx_pid);
+    if (!selected_pid) {
         User_Error_Handler(ERROR_MODULE_PID_NOT_FOUND);
         return;
     }
 
-
-    uint8_t rx_data_length = (uint8_t)(((uint64_t)data & UINT64_LENGTH_MASK) >> 56);
-    uint32_t rx_payload = 0;
-
-    if (!IN_RANGE(rx_data_length, 0, 8)) {
-        send_Console_Msg("Er data len out of range");
-        Error_Handler();
-    }
-
-    memcpy(&rx_payload, ((uint8_t *)&data), rx_data_length);
-
-    if ((rx_pid == 0x2B00) && (rx_payload == 0x60000000))
-       {
-       	int i = 1;
-
-       }
+    // Process signals for the selected PID
     iterate_signals_for_changes(selected_pid, rx_payload);
 }

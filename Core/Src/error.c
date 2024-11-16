@@ -13,7 +13,7 @@
 
 void User_Error_Handler(uint8_t error_code)
 {
-	const char *error_prefix = "ER#";
+	const char *error_prefix = "ER";
 	char error_msg[MAX_ERROR_STRING_LENGTH];
 	char error_msg_final[MAX_ERROR_STRING_LENGTH];
 	bool call_main_error_handler = true;

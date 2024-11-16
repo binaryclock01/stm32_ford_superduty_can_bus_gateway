@@ -12,6 +12,7 @@ CANDevicePID bcm_pids[] = {
     {
         .name = "Hazard Button", .short_name = "Hzd",
         .pid_id = {0x71, 0x50},
+		.num_of_signals = 1,
         .signals = {
             { .name = "Hazard Button", .short_name = "Hzd",
               .change_type = STATE_BIT, .data = 0,
@@ -21,7 +22,8 @@ CANDevicePID bcm_pids[] = {
     {
         .name = "Brake Pedal", .short_name = "Brk",
         .pid_id = {0x2B, 0x00},
-        .signals = {
+		.num_of_signals = 1,
+		.signals = {
             { .name = "Brake Pedal", .short_name = "Brk",
               .change_type = STATE_BIT, .data = 0,
               .change_data = {0x40, 0x00, 0x00, 0x00} }
@@ -30,6 +32,7 @@ CANDevicePID bcm_pids[] = {
     {
         .name = "Reverse Light", .short_name = "Rev",
         .pid_id = {0x40, 0xC8},
+		.num_of_signals = 1,
         .signals = {
             { .name = "Reverse Light", .short_name = "Rev",
               .change_type = STATE_BIT, .data = 0,
@@ -43,6 +46,7 @@ CANDevicePID sccm_pids[] = {
     {
         .name = "Turn Signals", .short_name = "TS",
         .pid_id = {0x71, 0x50},
+		.num_of_signals = 4,
         .signals = {
             { .name = "Left Turn Signal", .short_name = "LT",
               .change_type = STATE_BIT, .data = 0,

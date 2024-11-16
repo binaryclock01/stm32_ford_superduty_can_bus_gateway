@@ -43,6 +43,8 @@ extern "C" {
 /* Exported constants --------------------------------------------------------*/
 /* USER CODE BEGIN EC */
 
+// #define LOOPBACK_MODE
+
 /* ---| CAN TYPES CONSTANTS |------------------------------------------------ */
 #define CAN_TRUCK 0
 #define CAN_OTHER 1

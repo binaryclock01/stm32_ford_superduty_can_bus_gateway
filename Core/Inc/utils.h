@@ -17,7 +17,7 @@ extern "C" {
 /* -----------------------------------------------------------------------------
    Function Declarations
    -------------------------------------------------------------------------- */
-
+void bytes_to_big_endian(void *dest, const uint8_t *src, size_t size);
 /**
  * @brief Convert a 4-byte array into a 32-bit unsigned integer (big-endian).
  * @param bytes Pointer to a 4-byte array.
