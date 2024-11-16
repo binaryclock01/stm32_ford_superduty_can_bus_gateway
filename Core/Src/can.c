@@ -36,22 +36,35 @@
  * @param pid Pointer to the CANDevicePID representing the PID to request.
  * @return uint64_t The constructed 64-bit CAN request payload.
  */
+#define CHAR_BIT 8
 uint64_t build_can_request(CANDeviceConfig *device, CANDevicePID *pid) {
     uint64_t uint64_payload = 0;
 
-    uint8_t request_size_in_bytes = 0x03;  // Payload size: Length + Command + PID
-    uint8_t command_byte = can_request_commands[CMD_READ].byte;  // Read command (0x22)
-    uint16_t pid_id = __builtin_bswap16(*(uint16_t *)pid->pid_id);  // Convert PID to big-endian
+    // Validate inputs
+    if (!device || !pid) {
+        return 0;  // Return an empty payload on invalid inputs
+    }
 
-    uint8_t starting_msb = ((MAX_DLC_BYTE_LENGTH - 1) * 8);  // MSB position for 8-byte payload
+    // Payload size: Length (1 byte) + Command (1 byte) + PID (2 bytes)
+    uint8_t request_size_in_bytes = 0x03;
+
+    // Command byte (e.g., Read command 0x22)
+    uint8_t command_byte = can_request_commands[CMD_READ].byte;
+
+    // PID in big-endian format
+    uint16_t pid_id = __builtin_bswap16(*(uint16_t *)pid->pid_id);
+
+    // Calculate MSB position for an 8-byte payload
+    uint8_t starting_msb = ((MAX_DLC_BYTE_LENGTH - 1) * CHAR_BIT);  // CHAR_BIT ensures portability
 
     // Construct payload
-    uint64_payload |= ((uint64_t)request_size_in_bytes) << (starting_msb - DATA_LENGTH_START * 8);
-    uint64_payload |= ((uint64_t)command_byte) << (starting_msb - DATA_COMMAND_START * 8);
-    uint64_payload |= ((uint64_t)pid_id) << (starting_msb - (DATA_PID_START + 1) * 8);
+    uint64_payload |= ((uint64_t)request_size_in_bytes) << (starting_msb - (DATA_LENGTH_START * CHAR_BIT));
+    uint64_payload |= ((uint64_t)command_byte) << (starting_msb - (DATA_COMMAND_START * CHAR_BIT));
+    uint64_payload |= ((uint64_t)pid_id) << (starting_msb - ((DATA_PID_START + 1) * CHAR_BIT));
 
     return uint64_payload;
 }
+
 
 /**
  * @brief Send a CAN request for a specific device and PID.
@@ -152,7 +165,7 @@ CANDevicePID *get_CANDevicePID_by_pid(CANDeviceConfig *module, uint16_t pid) {
         uint16_t module_pid = 0;
         for (int i = 0; i < PID_BYTE_LENGTH; i++)
         {
-            module_pid |= ((uint16_t)(device_pid->pid_id[i])) << (8 * (1 - i));
+            module_pid |= ((uint16_t)(((uint8_t)device_pid->pid_id[i]))) << (8 * (1 - i));
         }
         if (module_pid == pid) {
             return device_pid;
@@ -221,7 +234,7 @@ void parse_rx_CAN_message(uint32_t RAW_rx_id, uint8_t *RAW_rx_data_as_byte_array
     bytes_to_big_endian(&data, RAW_rx_data_as_byte_array, 8);  // Convert to big-endian
 
     uint8_t rx_data_length = (data >> 56) & 0xFF;  // Extract data length (highest byte)
-    uint16_t rx_pid = (data >> 40) & 0xFFFF;      // Extract PID (next 2 bytes)
+    uint16_t rx_pid = ((uint16_t)(data >> 32)) & 0x0000FFFF;      // Extract PID (next 2 bytes)
     uint32_t rx_payload = data & 0xFFFFFFFF;      // Extract payload (lowest 4 bytes)
 
     // Validate data length
@@ -230,10 +243,14 @@ void parse_rx_CAN_message(uint32_t RAW_rx_id, uint8_t *RAW_rx_data_as_byte_array
         Error_Handler();
     }
 
+    if (rx_pid == 0x40C8)
+    {
+    	int i = 5;
+    }
     // Get the PID configuration
     CANDevicePID *selected_pid = get_CANDevicePID_by_pid(selected_can_device, rx_pid);
     if (!selected_pid) {
-        User_Error_Handler(ERROR_MODULE_PID_NOT_FOUND);
+        //User_Error_Handler(ERROR_MODULE_PID_NOT_FOUND);
         return;
     }
 
