@@ -1,5 +1,0 @@
-../Core/Src/ui.c:19:6:init_OLED_Data	1
-../Core/Src/ui.c:26:6:scroll_messages	2
-../Core/Src/ui.c:36:6:send_Console_Msg	2
-../Core/Src/ui.c:55:6:display_messages	2
-../Core/Src/ui.c:69:6:draw_screen_data_states	2
