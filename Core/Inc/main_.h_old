@@ -1,0 +1,115 @@
+/* USER CODE BEGIN Header */
+/**
+  ******************************************************************************
+  * @file           : main.h
+  * @brief          : Header for main.c file.
+  *                   This file contains the common defines of the application.
+  ******************************************************************************
+  * @attention
+  *
+  * Copyright (c) 2024 STMicroelectronics.
+  * All rights reserved.
+  *
+  * This software is licensed under terms that can be found in the LICENSE file
+  * in the root directory of this software component.
+  * If no LICENSE file comes with this software, it is provided AS-IS.
+  *
+  ******************************************************************************
+  */
+/* USER CODE END Header */
+
+/* Define to prevent recursive inclusion -------------------------------------*/
+#ifndef __MAIN_H
+#define __MAIN_H
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/* Includes ------------------------------------------------------------------*/
+#include "stm32f4xx_hal.h"
+#include "ssd1306.h"
+
+/* Private includes ----------------------------------------------------------*/
+/* USER CODE BEGIN Includes */
+
+/* USER CODE END Includes */
+
+/* Exported types ------------------------------------------------------------*/
+/* USER CODE BEGIN ET */
+
+/* USER CODE END ET */
+
+/* Exported constants --------------------------------------------------------*/
+/* USER CODE BEGIN EC */
+
+/* ---| CAN TYPES CONSTANTS |------------------------------------------------------------------ */
+#define CAN_TRUCK 0
+#define CAN_OTHER 1
+#define CAN_MAX   2
+#define DLC_MAX   8
+/* ---| FONT CONSTANTS |----------------------------------------------------------------------- */
+#define SCREEN_FONT_HEIGHT 8 // using Font_6x8, so pixels 8 for height
+#define SCREEN_FONT_WIDTH 6 // using Font_6x8, so pixels 6 for width
+/* ---| DISPLAY CONSTANTS |-------------------------------------------------------------------- */
+#define SCREEN_MAX_CHAR_LINES SSD1306_HEIGHT / 8 // how many chars fit on the screen height
+#define SCREEN_MAX_CHAR_WIDTH SSD1306_WIDTH / 6 // how many chars fit on the screen width
+#define STATE_LINES 4 // Number of lines for the state info
+#define STATE_COLUMNS 2
+#define MESSAGE_LINES (SCREEN_MAX_CHAR_LINES - STATE_LINES)  // Lines for messages
+/* ---| TIME CONSTANTS |----------------------------------------------------------------------- */
+#define ONE_MILLISECOND 1 // no magic numbers (1ms) !!
+#define ONE_SECOND (ONE_MILLISECOND * 1000) // one second (1000ms)
+#define CAN_REQUEST_INTERVAL (50 * ONE_MILLISECOND) // CAN will send PID requests on this interval
+
+// Define CAN instance indexes for clarity and efficiency
+typedef uint8_t CANInstance;
+
+
+// CAN variables
+extern CAN_HandleTypeDef hcan1;
+extern I2C_HandleTypeDef hi2c1;
+
+extern CAN_TxHeaderTypeDef TxHeader[CAN_MAX];  // [0] for CAN1, [1] for CAN2
+extern CAN_RxHeaderTypeDef RxHeader[CAN_MAX];  // [0] for CAN1, [1] for CAN2
+extern uint32_t TxMailbox[CAN_MAX];            // Use 2 mailboxes
+extern uint8_t RxData[CAN_MAX][DLC_MAX];       // [0] for CAN1, [1] for CAN2, each with an 8-byte data buffer
+extern uint8_t TxData[CAN_MAX][DLC_MAX];       // [0] for CAN1, [1] for CAN2, each with an 8-byte data buffer
+extern uint32_t tx_count[CAN_MAX];             // Transmission counts
+extern uint32_t rx_count[CAN_MAX];             // Reception counts
+
+// Display variables
+extern char screen_data[SCREEN_MAX_CHAR_LINES][SCREEN_MAX_CHAR_WIDTH];
+extern char screen_data_states[SCREEN_MAX_CHAR_LINES][SCREEN_MAX_CHAR_WIDTH];
+extern uint8_t screen_line;
+
+// Time variables
+extern uint32_t last_can_request_time;
+
+/* USER CODE END EC */
+
+/* Exported macro ------------------------------------------------------------*/
+/* USER CODE BEGIN EM */
+
+#define IN_RANGE(value, min, max) ((value) >= (min) && (value) <= (max))
+
+/* USER CODE END EM */
+
+/* Exported functions prototypes ---------------------------------------------*/
+void Error_Handler(void);
+
+/* USER CODE BEGIN EFP */
+
+/* USER CODE END EFP */
+
+/* Private defines -----------------------------------------------------------*/
+
+/* USER CODE BEGIN Private defines */
+
+/* USER CODE END Private defines */
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* __MAIN_H */

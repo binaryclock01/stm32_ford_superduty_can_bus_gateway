@@ -1,0 +1,8 @@
+../Core/Inc/device_configs.h:35:24:get_request_id	16	static
+../Core/Src/can.c:20:10:build_can_request	112	static
+../Core/Src/can.c:43:6:send_can_request	320	static
+../Core/Src/can.c:85:6:send_all_can_requests	24	static
+../Core/Src/can.c:101:18:get_CANDeviceConfig_by_canid	24	static
+../Core/Src/can.c:114:15:get_CANDevicePID_by_pid	32	static
+../Core/Src/can.c:129:6:iterate_signals_for_changes	32	static
+../Core/Src/can.c:164:6:parse_rx_CAN_message	40	static
