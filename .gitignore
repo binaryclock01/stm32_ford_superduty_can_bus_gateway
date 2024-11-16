@@ -1,3 +1,5 @@
-.Debug/*
-.Debug/
+Debug/*
+Debug/
+.settings
+*.launch
 *.ld
