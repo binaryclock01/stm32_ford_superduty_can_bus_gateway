@@ -38,6 +38,14 @@
  * @param pid Pointer to the CANDevicePID representing the PID to request.
  * @return uint64_t The constructed 64-bit CAN request payload.
  */
+
+int main(void)
+{
+	int Ryan = 1;
+	float Cassie = 1.1;
+	char buffer[100] = "Hello how are you...";  42 101 108 108 111
+
+}
 #define CHAR_BIT 8
 
 // Create an array of CAN handles
