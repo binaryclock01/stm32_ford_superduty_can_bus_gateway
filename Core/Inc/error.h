@@ -11,8 +11,8 @@
 extern "C" {
 #endif
 
-#include <stdint.h>               // For fixed-width integer types
-#include <stdbool.h>              // For boolean support
+#include <stdint.h>  // For fixed-width integer types
+#include <stdbool.h> // For boolean support
 
 /* -----------------------------------------------------------------------------
    Constants and Macros
@@ -33,10 +33,19 @@ typedef enum {
     ERROR_MODULE_PID_NOT_FOUND,     /**< PID not found in module */
     ERROR_CAN_TRANSMIT_FAILED,      /**< CAN transmission failure */
     ERROR_CAN_INVALID_PAYLOAD,      /**< Invalid payload received */
-    ERROR_CAN_INIT_FAILED,          /**< CAN initialization failure */
-    ERROR_CAN_NOTIFICATION_FAILED,  /**< CAN notification activation failure */
-    ERROR_CAN_FILTER_CONFIG_FAILED  /**< CAN filter configuration failure */
+    ERROR_CAN_BUFFER_OVERFLOW,      /**< CAN buffer overflow error */
+    ERROR_CAN_FILTER_CONFIG_FAILED, /**< CAN filter configuration failed */
+    ERROR_CAN_INIT_FAILED,          /**< CAN initialization failed */
+    ERROR_CAN_NOTIFICATION_FAILED,  /**< CAN notification setup failed */
+    ERROR_CAN_RETRIEVE_FAILED,      /**< CAN message retrieval failed */
+    ERROR_CAN_PACKET_NULL,          /**< Received a null CAN packet */
+    ERROR_CAN_DATA_PARSE_FAILED,    /**< Failed to parse CAN data */
+    ERROR_CAN_DEVICE_NOT_FOUND,     /**< No matching CAN device found */
+    ERROR_CAN_PID_NOT_FOUND,        /**< No matching PID found for CAN device */
+    ERROR_CAN_QUEUE_FULL,           /**< CAN message queue full */
+	ERROR_CAN_QUEUE_INIT_FAILED
 } ErrorCodes;
+
 
 /* -----------------------------------------------------------------------------
    Function Declarations

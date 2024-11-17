@@ -77,7 +77,22 @@ void send_console_msg(const char *msg) {
     // Move to the next message line
     screen_line++;
 }
+/**
+ * @brief Update the OLED screen with the current state data and messages.
+ *
+ * This function updates both the state information (top area) and the
+ * message buffer (bottom area) of the OLED screen, ensuring a consistent
+ * display of system status.
+ *
+ * @param can_instance The CAN instance (e.g., CAN_TRUCK or CAN_AUX) to display state data for.
+ */
+void update_oled_status(CANInstance can_instance) {
+    // Step 1: Update the state information for the specified CAN instance
+    draw_screen_data_states(can_instance);
 
+    // Step 2: Update the message display
+    display_messages();
+}
 /**
  * @brief Display messages stored in the message buffer.
  *

@@ -46,6 +46,7 @@ extern "C" {
 
 #include "device_configs.h"
 #include "ssd1306_conf.h"
+#include "cmsis_os.h"        // RTOS CMSIS types, such as osMutedId_t
 
 /* ---| CAN TYPES CONSTANTS |------------------------------------------------ */
 
@@ -59,6 +60,10 @@ extern "C" {
 extern CAN_HandleTypeDef hcan1;
 extern CAN_HandleTypeDef hcan2;
 extern I2C_HandleTypeDef hi2c1;
+
+extern osMessageQueueId_t CAN1_Rx_QueueHandle;
+extern osMessageQueueId_t CAN2_Rx_QueueHandle;
+extern osMessageQueueId_t Tx_QueueHandle;
 
 /**
  * @brief Display-related variables.

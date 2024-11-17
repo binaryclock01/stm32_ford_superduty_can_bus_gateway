@@ -18,6 +18,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "cmsis_os.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -55,7 +56,51 @@ CAN_HandleTypeDef hcan2;
 
 I2C_HandleTypeDef hi2c1;
 
+/* Definitions for CAN1_Rx_Task */
+osThreadId_t CAN1_Rx_TaskHandle;
+const osThreadAttr_t CAN1_Rx_Task_attributes = {
+  .name = "CAN1_Rx_Task",
+  .stack_size = 1024 * 4,
+  .priority = (osPriority_t) osPriorityHigh,
+};
+/* Definitions for CAN2_Rx_Task */
+osThreadId_t CAN2_Rx_TaskHandle;
+const osThreadAttr_t CAN2_Rx_Task_attributes = {
+  .name = "CAN2_Rx_Task",
+  .stack_size = 1024 * 4,
+  .priority = (osPriority_t) osPriorityHigh,
+};
+/* Definitions for Tx_Task */
+osThreadId_t Tx_TaskHandle;
+const osThreadAttr_t Tx_Task_attributes = {
+  .name = "Tx_Task",
+  .stack_size = 1024 * 4,
+  .priority = (osPriority_t) osPriorityNormal,
+};
+/* Definitions for Housekeeping_Ta */
+osThreadId_t Housekeeping_TaHandle;
+const osThreadAttr_t Housekeeping_Ta_attributes = {
+  .name = "Housekeeping_Ta",
+  .stack_size = 512 * 4,
+  .priority = (osPriority_t) osPriorityLow,
+};
 /* USER CODE BEGIN PV */
+
+osMessageQueueId_t CAN1_Rx_QueueHandle;
+osMessageQueueId_t CAN2_Rx_QueueHandle;
+osMessageQueueId_t Tx_QueueHandle;
+
+const osMessageQueueAttr_t CAN1_Rx_Queue_attributes = {
+  .name = "CAN1_Rx_Queue"
+};
+
+const osMessageQueueAttr_t CAN2_Rx_Queue_attributes = {
+  .name = "CAN2_Rx_Queue"
+};
+
+const osMessageQueueAttr_t Tx_Queue_attributes = {
+  .name = "Tx_Queue"
+};
 
 /* USER CODE END PV */
 
@@ -65,6 +110,11 @@ static void MX_GPIO_Init(void);
 static void MX_CAN1_Init(void);
 static void MX_I2C1_Init(void);
 static void MX_CAN2_Init(void);
+void StartCAN1_Rx_Task(void *argument);
+void StartCAN2_Rx_Task(void *argument);
+void Start_Tx_Task(void *argument);
+void StartHousekeeping_Task(void *argument);
+
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -84,31 +134,42 @@ uint32_t last_can_request_time = 0;  // Store the last time CAN requests were se
  * FUNCTIONS
  */
 
-/**
- * @brief Callback function triggered when a CAN message is pending in FIFO0.
- *
- * This function is called when a CAN message is received and stored in FIFO0.
- * It retrieves the message and passes it to the high-level handler for processing.
- *
- * @param hcan Pointer to the CAN hardware handle (e.g., CAN1 or CAN2).
- */
 void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan) {
-    // Step 1: Determine the CAN instance
-    // Map the hardware instance to the corresponding CANInstance index (e.g., CAN_TRUCK or CAN_AUX).
-    CANInstance can_instance = get_can_instance_from_hcan(hcan);
+    osMessageQueueId_t target_queue;
+    CANInstance can_instance;
 
-    // Step 2: Retrieve the CAN message
-    // Attempt to fetch the message from FIFO0. If this operation fails, log the error and exit.
-    if (!retrieve_can_message(hcan, can_instance)) {
-        // Error is logged within `retrieve_can_message`.
+    // Step 1: Determine the CAN instance and corresponding queue
+    if (hcan == &hcan1) {
+        can_instance = CAN_TRUCK;
+        target_queue = CAN1_Rx_QueueHandle;
+    } else if (hcan == &hcan2) {
+        can_instance = CAN_AUX;
+        target_queue = CAN2_Rx_QueueHandle;
+    } else {
+        user_error_handler(ERROR_CAN_MODULE_NOT_FOUND, "Unknown CAN instance");
         return;
     }
 
-    // Step 3: Handle and process the CAN packet
-    // Use the higher-level `handle_incoming_can_packet` function to parse, validate,
-    // log, and process the received CAN message.
-    handle_incoming_can_packet(can_instance);
+    // Step 2: Allocate a packet from the pool
+    CANPacket *packet = allocate_can_packet();
+    if (!packet) {
+        user_error_handler(ERROR_CAN_BUFFER_OVERFLOW, "No free packet in pool");
+        return; // Exit early if no packet is available
+    }
+
+    // Step 3: Retrieve the CAN message
+    if (!retrieve_can_message(hcan, can_instance, packet)) {
+        free_can_packet(packet); // Return the packet to the pool
+        return; // Exit if retrieval fails
+    }
+
+    // Step 4: Add the packet to the message queue
+    if (osMessageQueuePut(target_queue, &packet, 0, 0) != osOK) {
+        free_can_packet(packet); // Free the packet if queue is full
+        user_error_handler(ERROR_CAN_QUEUE_FULL, "Message queue full");
+    }
 }
+
 
 
 /* USER CODE END 0 */
@@ -171,16 +232,68 @@ int main(void)
 
   /* USER CODE END 2 */
 
+  /* Init scheduler */
+  osKernelInitialize();
+
+  /* USER CODE BEGIN RTOS_MUTEX */
+  /* add mutexes, ... */
+  /* USER CODE END RTOS_MUTEX */
+
+  /* USER CODE BEGIN RTOS_SEMAPHORES */
+  /* add semaphores, ... */
+  /* USER CODE END RTOS_SEMAPHORES */
+
+  /* USER CODE BEGIN RTOS_TIMERS */
+  /* start timers, add new ones, ... */
+  /* USER CODE END RTOS_TIMERS */
+
+  /* USER CODE BEGIN RTOS_QUEUES */
+
+  CAN1_Rx_QueueHandle = osMessageQueueNew(16, sizeof(CANPacket *), &CAN1_Rx_Queue_attributes);
+  if (CAN1_Rx_QueueHandle == NULL) {
+      user_error_handler(ERROR_CAN_QUEUE_INIT_FAILED, "Failed to create CAN1 Rx queue");
+  }
+  CAN2_Rx_QueueHandle = osMessageQueueNew(16, sizeof(CANPacket *), &CAN2_Rx_Queue_attributes);
+  if (CAN2_Rx_QueueHandle == NULL) {
+      user_error_handler(ERROR_CAN_QUEUE_INIT_FAILED, "Failed to create CAN2 Rx queue");
+  }
+  Tx_QueueHandle = osMessageQueueNew(16, sizeof(CANMessage), &Tx_Queue_attributes); // Tx queue may use CANMessage directly
+
+  /* USER CODE END RTOS_QUEUES */
+
+  /* Create the thread(s) */
+
+  /* creation of Housekeeping_Ta */
+  Housekeeping_TaHandle = osThreadNew(StartHousekeeping_Task, NULL, &Housekeeping_Ta_attributes);
+
+  /* creation of CAN1_Rx_Task */
+  CAN1_Rx_TaskHandle = osThreadNew(StartCAN1_Rx_Task, NULL, &CAN1_Rx_Task_attributes);
+
+  /* creation of CAN2_Rx_Task */
+  CAN2_Rx_TaskHandle = osThreadNew(StartCAN2_Rx_Task, NULL, &CAN2_Rx_Task_attributes);
+
+  /* creation of Tx_Task */
+  Tx_TaskHandle = osThreadNew(Start_Tx_Task, NULL, &Tx_Task_attributes);
+
+  /* USER CODE BEGIN RTOS_THREADS */
+
+
+  /* USER CODE END RTOS_THREADS */
+
+  /* USER CODE BEGIN RTOS_EVENTS */
+  /* add events, ... */
+  /* USER CODE END RTOS_EVENTS */
+
+  /* Start scheduler */
+  osKernelStart();
+
+  /* We should never get here as control is now taken by the scheduler */
+
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
     /* USER CODE END WHILE */
-
-	  // This will send all CAN requests for data to the vehicle
-	  send_all_requests();
-
-	  HAL_Delay(CAN_REQUEST_INTERVAL);
 
     /* USER CODE BEGIN 3 */
   }
@@ -398,6 +511,153 @@ static void MX_GPIO_Init(void)
 /* USER CODE BEGIN 4 */
 
 /* USER CODE END 4 */
+
+/* USER CODE BEGIN Header_StartCAN1_Rx_Task */
+/**
+ * @brief Task to handle incoming CAN1 messages.
+ *
+ * Steps:
+ * 1. Wait for a CANPacket from the CAN1 queue (`osMessageQueueGet`).
+ * 2. Process the packet using `process_can_packet`.
+ * 3. Return the packet to the static pool using `free_can_packet`.
+ *
+ * @param argument Unused FreeRTOS task argument placeholder.
+ */
+/* USER CODE END Header_StartCAN1_Rx_Task */
+void StartCAN1_Rx_Task(void *argument)
+{
+  /* USER CODE BEGIN StartCAN1_Rx_Task */
+  for (;;) {
+      CANPacket *packet = NULL; // Step 1: Declare a pointer to a CANPacket
+
+      // Step 2: Wait for a packet from the CAN1 queue
+      if (osMessageQueueGet(CAN1_Rx_QueueHandle, &packet, NULL, osWaitForever) == osOK) {
+          if (packet != NULL) {
+              process_can_packet(packet); // Step 3: Process the received packet
+              free_can_packet(packet);    // Step 4: Return the packet to the pool
+          }
+      }
+  }
+  /* USER CODE END StartCAN1_Rx_Task */
+}
+
+
+/* USER CODE BEGIN Header_StartCAN2_Rx_Task */
+/**
+ * @brief Task to handle incoming CAN2 messages.
+ *
+ * Steps:
+ * 1. Wait for a CANPacket from the CAN2 queue (`osMessageQueueGet`).
+ * 2. Process the packet using `process_can_packet`.
+ * 3. Return the packet to the static pool using `free_can_packet`.
+ *
+ * @param argument Unused FreeRTOS task argument placeholder.
+ */
+/* USER CODE END Header_StartCAN2_Rx_Task */
+void StartCAN2_Rx_Task(void *argument)
+{
+  /* USER CODE BEGIN StartCAN2_Rx_Task */
+  for (;;) {
+      CANPacket *packet = NULL; // Step 1: Declare a pointer to a CANPacket
+
+      // Step 2: Wait for a packet from the CAN2 queue
+      if (osMessageQueueGet(CAN2_Rx_QueueHandle, &packet, NULL, osWaitForever) == osOK) {
+          if (packet != NULL) {
+              process_can_packet(packet); // Step 3: Process the received packet
+              free_can_packet(packet);    // Step 4: Return the packet to the pool
+          }
+      }
+  }
+  /* USER CODE END StartCAN2_Rx_Task */
+}
+
+
+/* USER CODE BEGIN Header_Start_Tx_Task */
+/**
+ * @brief Task to handle transmitting CAN messages.
+ *
+ * This task retrieves messages from the Tx queue and sends them over the CAN bus.
+ * Includes retry logic for failed transmissions.
+ *
+ * @param argument Not used (FreeRTOS task argument placeholder).
+ */
+/* USER CODE END Header_Start_Tx_Task */
+void Start_Tx_Task(void *argument)
+{
+  /* USER CODE BEGIN Start_Tx_Task */
+  for (;;) {
+      CANMessage tx_packet; // Step 1: Declare a CANMessage structure
+
+      // Step 2: Wait indefinitely for a message to arrive in the Tx queue
+      if (osMessageQueueGet(Tx_QueueHandle, &tx_packet, NULL, osWaitForever) == osOK) {
+          CAN_HandleTypeDef *hcan = can_handles[tx_packet.can_instance]; // Step 3: Retrieve the correct CAN handle
+          bool sent = false;
+
+          // Step 4: Retry logic for sending the CAN message
+          for (int retry = 0; retry < MAX_RETRIES; retry++) {
+              if (_send_can_packet(hcan, &tx_packet.data)) {
+                  sent = true;
+                  break; // Exit the retry loop on success
+              }
+              osDelay(RETRY_DELAY_MS); // Wait before retrying
+          }
+
+          if (!sent) {
+              // Step 5: Handle transmission failure
+              user_error_handler(ERROR_CAN_TRANSMIT_FAILED, "Max retries reached for CAN Tx");
+          }
+      }
+  }
+  /* USER CODE END Start_Tx_Task */
+}
+
+
+/* USER CODE BEGIN Header_StartHousekeeping_Task */
+/**
+ * @brief Task to handle periodic housekeeping actions.
+ *
+ * This task updates the OLED display for a specified CAN instance
+ * and performs routine system health checks.
+ *
+ * @param argument Not used (FreeRTOS task argument placeholder).
+ */
+/* USER CODE END Header_StartHousekeeping_Task */
+void StartHousekeeping_Task(void *argument)
+{
+  /* USER CODE BEGIN StartHousekeeping_Task */
+  for (;;) {
+      // Step 1: Update OLED display for the specified CAN instance
+      update_oled_status(DEFAULT_OLED_CAN_INSTANCE);
+
+      // Step 2: Perform system health checks
+      // check_system_health(); // Uncomment if system health monitoring is implemented
+
+      osDelay(ONE_SECOND); // Delay task execution to run periodically (every 1000ms)
+  }
+  /* USER CODE END StartHousekeeping_Task */
+}
+
+
+/**
+  * @brief  Period elapsed callback in non blocking mode
+  * @note   This function is called  when TIM6 interrupt took place, inside
+  * HAL_TIM_IRQHandler(). It makes a direct call to HAL_IncTick() to increment
+  * a global variable "uwTick" used as application time base.
+  * @param  htim : TIM handle
+  * @retval None
+  */
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+  /* USER CODE BEGIN Callback 0 */
+
+  /* USER CODE END Callback 0 */
+  if (htim->Instance == TIM6) {
+    HAL_IncTick();
+  }
+  /* USER CODE BEGIN Callback 1 */
+
+  /* USER CODE END Callback 1 */
+}
 
 /**
   * @brief  This function is executed in case of error occurrence.

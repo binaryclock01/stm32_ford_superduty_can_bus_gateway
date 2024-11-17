@@ -32,6 +32,7 @@ extern "C" {
 #define SCREEN_MAX_CHAR_WIDTH (SSD1306_WIDTH / SCREEN_FONT_WIDTH)   /**< Max chars on screen width. */
 #define STATE_LINES 4           /**< Number of lines used for state info. */
 #define MESSAGE_LINES (SCREEN_MAX_CHAR_LINES - STATE_LINES) /**< Remaining lines for messages. */
+#define DEFAULT_OLED_CAN_INSTANCE CAN_TRUCK // Default CAN instance for OLED updates
 
 extern char screen_data[SCREEN_MAX_CHAR_LINES][SCREEN_MAX_CHAR_WIDTH];
 extern char screen_data_states[SCREEN_MAX_CHAR_LINES][SCREEN_MAX_CHAR_WIDTH];
@@ -40,6 +41,17 @@ extern uint8_t screen_line;
 /* -----------------------------------------------------------------------------
    Function Declarations
    -------------------------------------------------------------------------- */
+
+/**
+ * @brief Update the OLED screen with the current state data and messages.
+ *
+ * This function updates both the state information (top area) and the
+ * message buffer (bottom area) of the OLED screen, ensuring a consistent
+ * display of system status.
+ *
+ * @param can_instance The CAN instance (e.g., CAN_TRUCK or CAN_AUX) to display state data for.
+ */
+void update_oled_status(CANInstance can_instance);
 
 /**
  * @brief Initialize the OLED display buffers and reset screen counters.
