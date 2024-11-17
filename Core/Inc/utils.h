@@ -14,6 +14,10 @@ extern "C" {
 
 #include <stdint.h>  // For fixed-width integer types
 
+/* ---| TIME CONSTANTS |----------------------------------------------------- */
+#define ONE_MILLISECOND 1       /**< One millisecond in timer ticks. */
+#define ONE_SECOND (ONE_MILLISECOND * 1000) /**< One second in timer ticks. */
+
 /* -----------------------------------------------------------------------------
    Function Declarations
    -------------------------------------------------------------------------- */

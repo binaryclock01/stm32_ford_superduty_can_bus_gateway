@@ -423,7 +423,7 @@ void log_valid_can_data(const ParsedCANData *parsed_data) {
 }
 
 // Define a mapping array to map hardware instances to CANInstance indexes
-CANInstance get_can_instance(CAN_HandleTypeDef *hcan) {
+CANInstance get_can_instance_from_hcan(CAN_HandleTypeDef *hcan) {
     static const CAN_HandleTypeDef *can_handles[CAN_TOTAL] = {&hcan1, &hcan2};
 
     for (uint8_t i = 0; i < CAN_TOTAL; i++) {

@@ -22,11 +22,13 @@ extern "C" {
 #include "main.h"               // HAL_CAN definitions
 #include "ui.h"                 // Console message utilities
 #include "error.h"              // Error handling utilities
+#include "utils.h"
 
 /* -----------------------------------------------------------------------------
    Constants and Macros
    -------------------------------------------------------------------------- */
 
+#define CAN_REQUEST_INTERVAL (50 * ONE_MILLISECOND) /**< Interval for CAN requests in ms. */
 #define DLC_MAX 8 /**< Maximum data length for standard CAN frames */
 
 /* -----------------------------------------------------------------------------
@@ -193,7 +195,7 @@ void log_valid_can_data(const ParsedCANData *parsed_data);
  * @param hcan Pointer to the HAL CAN handle.
  * @return The CANInstance (e.g., CAN_TRUCK or CAN_AUX).
  */
-CANInstance get_can_instance(CAN_HandleTypeDef *hcan);
+CANInstance get_can_instance_from_hcan(CAN_HandleTypeDef *hcan);
 
 /**
  * @brief Determine if a CAN message should be ignored.
@@ -203,6 +205,16 @@ CANInstance get_can_instance(CAN_HandleTypeDef *hcan);
  * @param can_id The CAN ID of the message.
  * @return true if the message should be ignored, false otherwise.
  */
+
+/**
+ * @brief Send CAN requests for all devices and their PIDs.
+ *
+ * Iterates through all configured devices and PIDs and sends a CAN request for each.
+ * This function is typically used to initialize communication or request status
+ * from all known devices on the CAN network.
+ */
+void send_all_requests(void);
+
 bool should_ignore_message(uint32_t can_id);
 
 extern CANData can_data[CAN_TOTAL];

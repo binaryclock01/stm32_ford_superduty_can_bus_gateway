@@ -77,20 +77,6 @@ static void MX_CAN2_Init(void);
 /* ---| CAN VARIABLES |------------------------------------------------------------------------ */
 
 
-/*
-CAN_TxHeaderTypeDef TxHeader[CAN_TOTAL]; // [0] for CAN1, [1] for CAN2
-CAN_RxHeaderTypeDef RxHeader[CAN_TOTAL]; // [0] for CAN1, [1] for CAN2
-uint32_t TxMailbox[CAN_MAX];           // Use 2 mailboxes
-uint8_t RxData[CAN_MAX][DLC_MAX];      // [0] for CAN1, [1] for CAN2, each with an 8-byte data buffer
-uint8_t TxData[CAN_MAX][DLC_MAX];      // [0] for CAN1, [1] for CAN2, each with an 8-byte data buffer
-uint32_t tx_count[CAN_MAX] = {0, 0};
-uint32_t rx_count[CAN_MAX] = {0, 0};
-*/
-
-/* ---| DISPLAY VARIABLES |-------------------------------------------------------------------- */
-char screen_data[SCREEN_MAX_CHAR_LINES][SCREEN_MAX_CHAR_WIDTH];
-char screen_data_states[SCREEN_MAX_CHAR_LINES][SCREEN_MAX_CHAR_WIDTH];
-uint8_t screen_line = 0;
 /* ---| TIME VARIABLES |-------------------------------------------------------------------- */
 uint32_t last_can_request_time = 0;  // Store the last time CAN requests were sent
 
@@ -109,7 +95,7 @@ uint32_t last_can_request_time = 0;  // Store the last time CAN requests were se
 void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan) {
     // Step 1: Determine the CAN instance
     // Map the hardware instance to the corresponding CANInstance index (e.g., CAN_TRUCK or CAN_AUX).
-    CANInstance can_instance = (hcan->Instance == CAN1) ? CAN_TRUCK : CAN_AUX;
+    CANInstance can_instance = get_can_instance_from_hcan(hcan);
 
     // Step 2: Retrieve the CAN message
     // Attempt to fetch the message from FIFO0. If this operation fails, log the error and exit.
@@ -190,6 +176,11 @@ int main(void)
   while (1)
   {
     /* USER CODE END WHILE */
+
+	  // This will send all CAN requests for data to the vehicle
+	  send_all_requests();
+
+	  HAL_Delay(CAN_REQUEST_INTERVAL);
 
     /* USER CODE BEGIN 3 */
   }

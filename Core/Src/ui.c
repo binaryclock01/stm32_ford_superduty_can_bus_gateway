@@ -16,6 +16,13 @@
 #include "utils.h"
 #include "can.h"
 
+
+/* ---| DISPLAY VARIABLES |-------------------------------------------------------------------- */
+char screen_data[SCREEN_MAX_CHAR_LINES][SCREEN_MAX_CHAR_WIDTH];
+char screen_data_states[SCREEN_MAX_CHAR_LINES][SCREEN_MAX_CHAR_WIDTH];
+uint8_t screen_line = 0;
+
+
 /**
  * @brief Initialize OLED screen data buffers.
  *

@@ -53,22 +53,6 @@ extern "C" {
 //#define CAN_AUX   1
 //#define CAN_MAX   2
 
-/* ---| FONT CONSTANTS |----------------------------------------------------- */
-#define SCREEN_FONT_HEIGHT 8   /**< Font height in pixels (Font_6x8). */
-#define SCREEN_FONT_WIDTH  6   /**< Font width in pixels (Font_6x8). */
-
-/* ---| DISPLAY CONSTANTS |-------------------------------------------------- */
-#define SCREEN_MAX_CHAR_LINES (SSD1306_HEIGHT / SCREEN_FONT_HEIGHT) /**< Max lines on screen height. */
-#define SCREEN_MAX_CHAR_WIDTH (SSD1306_WIDTH / SCREEN_FONT_WIDTH)   /**< Max chars on screen width. */
-#define STATE_LINES 4           /**< Number of lines used for state info. */
-#define MESSAGE_LINES (SCREEN_MAX_CHAR_LINES - STATE_LINES) /**< Remaining lines for messages. */
-
-/* ---| TIME CONSTANTS |----------------------------------------------------- */
-#define ONE_MILLISECOND 1       /**< One millisecond in timer ticks. */
-#define ONE_SECOND (ONE_MILLISECOND * 1000) /**< One second in timer ticks. */
-#define CAN_REQUEST_INTERVAL (50 * ONE_MILLISECOND) /**< Interval for CAN requests in ms. */
-
-
 /**
  * @brief CAN-related variables.
  */
@@ -76,22 +60,9 @@ extern CAN_HandleTypeDef hcan1;
 extern CAN_HandleTypeDef hcan2;
 extern I2C_HandleTypeDef hi2c1;
 
-
-
-//extern CAN_TxHeaderTypeDef TxHeader[CAN_TOTAL];  /**< Transmission headers for CAN1 and CAN2. */
-//extern CAN_RxHeaderTypeDef RxHeader[CAN_TOTAL];  /**< Reception headers for CAN1 and CAN2. */
-//extern uint32_t TxMailbox[CAN_TOTAL];            /**< Transmission mailboxes. */
-//extern uint8_t RxData[CAN_TOTAL][DLC_MAX];       /**< Reception data buffers (8 bytes each). */
-//extern uint8_t TxData[CAN_TOTAL][DLC_MAX];       /**< Transmission data buffers (8 bytes each). */
-//extern uint32_t tx_count[CAN_TOTAL];             /**< Transmission counts for CAN instances. */
-//extern uint32_t rx_count[CAN_TOTAL];             /**< Reception counts for CAN instances. */
-
 /**
  * @brief Display-related variables.
  */
-extern char screen_data[SCREEN_MAX_CHAR_LINES][SCREEN_MAX_CHAR_WIDTH]; /**< Screen data buffer. */
-extern char screen_data_states[SCREEN_MAX_CHAR_LINES][SCREEN_MAX_CHAR_WIDTH]; /**< State info buffer. */
-extern uint8_t screen_line; /**< Current screen line index. */
 
 /**
  * @brief Time-related variables.
