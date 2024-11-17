@@ -17,7 +17,6 @@
   */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
-
 #include "main.h"
 
 /* Private includes ----------------------------------------------------------*/
@@ -31,6 +30,7 @@
 #include "ssd1306_fonts.h"
 #include "ui.h"
 #include "can.h"
+#include "device_configs.h"
 
 /* USER CODE END Includes */
 
@@ -51,6 +51,7 @@
 
 /* Private variables ---------------------------------------------------------*/
 CAN_HandleTypeDef hcan1;
+CAN_HandleTypeDef hcan2;
 
 I2C_HandleTypeDef hi2c1;
 
@@ -63,6 +64,7 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_CAN1_Init(void);
 static void MX_I2C1_Init(void);
+static void MX_CAN2_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -73,13 +75,18 @@ static void MX_I2C1_Init(void);
 /* ---| CAN TYPEDEFS |------------------------------------------------------------------------- */
 
 /* ---| CAN VARIABLES |------------------------------------------------------------------------ */
-CAN_TxHeaderTypeDef TxHeader[CAN_MAX]; // [0] for CAN1, [1] for CAN2
-CAN_RxHeaderTypeDef RxHeader[CAN_MAX]; // [0] for CAN1, [1] for CAN2
+
+
+/*
+CAN_TxHeaderTypeDef TxHeader[CAN_TOTAL]; // [0] for CAN1, [1] for CAN2
+CAN_RxHeaderTypeDef RxHeader[CAN_TOTAL]; // [0] for CAN1, [1] for CAN2
 uint32_t TxMailbox[CAN_MAX];           // Use 2 mailboxes
 uint8_t RxData[CAN_MAX][DLC_MAX];      // [0] for CAN1, [1] for CAN2, each with an 8-byte data buffer
 uint8_t TxData[CAN_MAX][DLC_MAX];      // [0] for CAN1, [1] for CAN2, each with an 8-byte data buffer
 uint32_t tx_count[CAN_MAX] = {0, 0};
 uint32_t rx_count[CAN_MAX] = {0, 0};
+*/
+
 /* ---| DISPLAY VARIABLES |-------------------------------------------------------------------- */
 char screen_data[SCREEN_MAX_CHAR_LINES][SCREEN_MAX_CHAR_WIDTH];
 char screen_data_states[SCREEN_MAX_CHAR_LINES][SCREEN_MAX_CHAR_WIDTH];
@@ -91,37 +98,32 @@ uint32_t last_can_request_time = 0;  // Store the last time CAN requests were se
  * FUNCTIONS
  */
 
-void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
-{
-	//send_Console_Msg("Rx INT");
-    // Ensure this is the correct CAN instance
-    if (hcan->Instance != CAN1)
-    {
+/**
+ * @brief Callback function triggered when a CAN message is pending in FIFO0.
+ *
+ * This function is called when a CAN message is received and stored in FIFO0.
+ * It retrieves the message and passes it to the high-level handler for processing.
+ *
+ * @param hcan Pointer to the CAN hardware handle (e.g., CAN1 or CAN2).
+ */
+void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan) {
+    // Step 1: Determine the CAN instance
+    // Map the hardware instance to the corresponding CANInstance index (e.g., CAN_TRUCK or CAN_AUX).
+    CANInstance can_instance = (hcan->Instance == CAN1) ? CAN_TRUCK : CAN_AUX;
+
+    // Step 2: Retrieve the CAN message
+    // Attempt to fetch the message from FIFO0. If this operation fails, log the error and exit.
+    if (!retrieve_can_message(hcan, can_instance)) {
+        // Error is logged within `retrieve_can_message`.
         return;
     }
-    // Retrieve the message from FIFO0
-    if (HAL_CAN_GetRxMessage(hcan, CAN_RX_FIFO0, &RxHeader[CAN_TRUCK], RxData[CAN_TRUCK]) != HAL_OK)
-    {
-        send_Console_Msg("RX:ERR CAN_GetRxMessage");
-    	// Log or handle error if message retrieval fails
-        return;
-    }
-    // Increment the receive counter
-    rx_count[CAN_TRUCK]++;
-    // Format the received message for display
-    char received_msg[255];
-    int offset = snprintf(received_msg, sizeof(received_msg), "Rx %X/", (unsigned int)RxHeader[CAN_TRUCK].StdId);
 
-    for (int i = 0; i < RxHeader[CAN_TRUCK].DLC; i++)
-    {
-        offset += snprintf(&received_msg[offset], sizeof(received_msg) - offset, "%02X", RxData[CAN_TRUCK][i]);
-    }
-    // Display the received message
-    send_Console_Msg(received_msg);
-    // Process the message to update the state
-
-    parse_rx_CAN_message(RxHeader[CAN_TRUCK].StdId, RxData[CAN_TRUCK]);
+    // Step 3: Handle and process the CAN packet
+    // Use the higher-level `handle_incoming_can_packet` function to parse, validate,
+    // log, and process the received CAN message.
+    handle_incoming_can_packet(can_instance);
 }
+
 
 /* USER CODE END 0 */
 
@@ -156,25 +158,29 @@ int main(void)
   MX_GPIO_Init();
   MX_CAN1_Init();
   MX_I2C1_Init();
+  MX_CAN2_Init();
   /* USER CODE BEGIN 2 */
 
   ssd1306_Init(); // init OLED screen
-  init_OLED_Data(); // zero all string data
+  init_oled_data(); // zero all string data
 
-  if (HAL_CAN_Start(&hcan1) != HAL_OK)
-  {
-	  send_Console_Msg("Err Init TRUCK CAN");
-	  ssd1306_SetCursor(0, 8);  // Move down by the font height
-	  send_Console_Msg("Terminating.");
-	  Error_Handler();
+
+  // Initialize TRUCK CAN (hcan1)
+  if (HAL_CAN_Start(&hcan1) != HAL_OK) {
+      user_error_handler(ERROR_CAN_INIT_FAILED, "Failed to start TRUCK CAN");
+      return HAL_ERROR;  // Use HAL-defined error code for system failure
   }
 
-  if (HAL_CAN_ActivateNotification(&hcan1, CAN_IT_RX_FIFO0_MSG_PENDING) != HAL_OK)
-  {
-	  send_Console_Msg("Err Init TRUCK Rx");
-	  ssd1306_SetCursor(0, 8);  // Move down by the font height
-	  send_Console_Msg("Terminating.");
-	  Error_Handler();
+  // Activate notification for TRUCK CAN
+  if (HAL_CAN_ActivateNotification(&hcan1, CAN_IT_RX_FIFO0_MSG_PENDING) != HAL_OK) {
+      user_error_handler(ERROR_CAN_NOTIFICATION_FAILED, "Failed to activate TRUCK CAN notifications");
+      return HAL_ERROR;  // Use HAL-defined error code for system failure
+  }
+
+  // Activate notification for AUX CAN (hcan2)
+  if (HAL_CAN_ActivateNotification(&hcan2, CAN_IT_RX_FIFO0_MSG_PENDING) != HAL_OK) {
+      user_error_handler(ERROR_CAN_NOTIFICATION_FAILED, "Failed to activate AUX CAN notifications");
+      return HAL_ERROR;  // Use HAL-defined error code for system failure
   }
 
   /* USER CODE END 2 */
@@ -183,17 +189,9 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-      draw_screen_data_states(CAN_TRUCK);  // Update the screen with state information
+    /* USER CODE END WHILE */
 
-      // Check if 2 seconds have passed since the last CAN request
-      uint32_t current_time = HAL_GetTick();  // Get the current system tick in milliseconds
-      if ((current_time - last_can_request_time) >= CAN_REQUEST_INTERVAL)
-      {
-    	  send_all_can_requests();
-          last_can_request_time = current_time;  // Update the last request time
-      }
-
-      // Additional tasks can be added here, and the loop will not block
+    /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
 }
@@ -268,13 +266,7 @@ static void MX_CAN1_Init(void)
   /* USER CODE END CAN1_Init 1 */
   hcan1.Instance = CAN1;
   hcan1.Init.Prescaler = 18;
-
-#ifdef LOOPBACK_MODE
-  hcan1.Init.Mode = CAN_MODE_LOOPBACK;
-#else
   hcan1.Init.Mode = CAN_MODE_NORMAL;
-#endif
-
   hcan1.Init.SyncJumpWidth = CAN_SJW_1TQ;
   hcan1.Init.TimeSeg1 = CAN_BS1_2TQ;
   hcan1.Init.TimeSeg2 = CAN_BS2_2TQ;
@@ -303,11 +295,49 @@ static void MX_CAN1_Init(void)
   sFilterConfig.FilterActivation = ENABLE;            // Enable the filter
 
   if (HAL_CAN_ConfigFilter(&hcan1, &sFilterConfig) != HAL_OK) {
-      send_Console_Msg("Er: Applying filter");
-      Error_Handler();
+      user_error_handler(ERROR_CAN_FILTER_CONFIG_FAILED, "Failed to apply CAN filter");
+      return;  // Exit gracefully
   }
 
   /* USER CODE END CAN1_Init 2 */
+
+}
+
+/**
+  * @brief CAN2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_CAN2_Init(void)
+{
+
+  /* USER CODE BEGIN CAN2_Init 0 */
+
+  /* USER CODE END CAN2_Init 0 */
+
+  /* USER CODE BEGIN CAN2_Init 1 */
+
+  /* USER CODE END CAN2_Init 1 */
+  hcan2.Instance = CAN2;
+  hcan2.Init.Prescaler = 18;
+  hcan2.Init.Mode = CAN_MODE_NORMAL;
+  hcan2.Init.SyncJumpWidth = CAN_SJW_1TQ;
+  hcan2.Init.TimeSeg1 = CAN_BS1_2TQ;
+  hcan2.Init.TimeSeg2 = CAN_BS2_2TQ;
+  hcan2.Init.TimeTriggeredMode = DISABLE;
+  hcan2.Init.AutoBusOff = DISABLE;
+  hcan2.Init.AutoWakeUp = DISABLE;
+  hcan2.Init.AutoRetransmission = DISABLE;
+  hcan2.Init.ReceiveFifoLocked = DISABLE;
+  hcan2.Init.TransmitFifoPriority = DISABLE;
+  if (HAL_CAN_Init(&hcan2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN CAN2_Init 2 */
+
+  /* USER CODE END CAN2_Init 2 */
+
 }
 
 /**

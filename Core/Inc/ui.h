@@ -3,6 +3,10 @@
  *
  * Created on: Nov 15, 2024
  * Author: Ryan
+ *
+ * Description:
+ * Header file for the UI module that handles OLED display updates,
+ * including managing message scrolling, console output, and state information.
  */
 
 #ifndef UI_H
@@ -15,36 +19,58 @@ extern "C" {
 #include <stdint.h>              // For fixed-width integer types
 #include <stdbool.h>             // For boolean support
 #include "main.h"                // For global variables and constants
-#include <device_configs.h>      // For CANInstance and related configurations
+#include "device_configs.h"      // For CANInstance and related configurations
+#include "can.h"
 
 /* -----------------------------------------------------------------------------
    Function Declarations
    -------------------------------------------------------------------------- */
 
 /**
- * @brief Initialize the OLED display data buffer and reset the screen line counter.
+ * @brief Initialize the OLED display buffers and reset screen counters.
+ *
+ * This function resets the internal buffers used for storing messages and
+ * state data displayed on the OLED. It also resets the screen line index,
+ * ensuring new messages start at the top of the message section.
  */
-void init_OLED_Data(void);
+void init_oled_data(void);
 
 /**
- * @brief Scrolls the message display, shifting messages up by one line.
+ * @brief Scroll messages on the OLED display.
+ *
+ * Shifts all messages in the message section of the display up by one line.
+ * The oldest message is discarded, and the last line is cleared to make room
+ * for a new message.
  */
 void scroll_messages(void);
 
 /**
- * @brief Sends a console message to the display and updates the message section.
- * @param msg Pointer to the message string to be displayed.
+ * @brief Send a message to the console and update the OLED display.
+ *
+ * Adds a new message to the message buffer and displays it on the OLED screen.
+ * If the buffer is full, older messages are scrolled up to make room.
+ *
+ * @param msg Pointer to the null-terminated message string to display.
  */
-void send_Console_Msg(char *msg);
+void send_console_msg(const char *msg);
 
 /**
- * @brief Updates the OLED display with the current messages.
+ * @brief Render all stored messages on the OLED display.
+ *
+ * Clears the message area of the OLED screen and writes all messages currently
+ * stored in the buffer. This function is typically called after updating the
+ * message buffer.
  */
 void display_messages(void);
 
 /**
- * @brief Draws state information for a specific CAN instance on the OLED display.
- * @param can_instance The CAN instance (e.g., CAN1 or CAN2) to display state information for.
+ * @brief Render state data for a specific CAN instance on the OLED display.
+ *
+ * Displays state information for a given CAN instance, including signal states
+ * and transmission/reception statistics. The state data is shown in the top
+ * section of the OLED screen.
+ *
+ * @param can_instance The CAN instance (e.g., CAN_TRUCK or CAN_AUX) to display data for.
  */
 void draw_screen_data_states(CANInstance can_instance);
 

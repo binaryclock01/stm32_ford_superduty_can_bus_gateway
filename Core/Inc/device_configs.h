@@ -10,6 +10,7 @@
 
 #include <stdint.h>   // For uint8_t, uint32_t types
 #include <stdbool.h>  // For boolean support
+#include "main.h"
 
 /* -----------------------------------------------------------------------------
    Constants and Macros
@@ -20,11 +21,13 @@
 #define MAX_DLC_BYTE_LENGTH 8
 #define MAX_SIGNALS_PER_PID 4
 #define MAX_PAYLOAD_LENGTH 4
-
+#define DLC_MAX   8
 /* -----------------------------------------------------------------------------
    CAN IDs and Enums
    -------------------------------------------------------------------------- */
 #define CAN_ID_HEARTBEAT 0x59E  // Heartbeat message
+
+
 
 typedef enum {
     CAN_ID_BCM = 0x72E,   // Body Control Module CAN ID
