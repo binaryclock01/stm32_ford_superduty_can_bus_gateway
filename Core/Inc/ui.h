@@ -20,7 +20,7 @@ extern "C" {
 #include <stdbool.h>             // For boolean support
 #include "main.h"                // For global variables and constants
 #include "device_configs.h"      // For CANInstance and related configurations
-#include "can.h"
+#include "can_common.h"
 
 
 /* ---| FONT CONSTANTS |----------------------------------------------------- */

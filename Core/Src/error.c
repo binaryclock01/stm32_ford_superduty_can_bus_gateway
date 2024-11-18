@@ -4,104 +4,160 @@
  * Implements error handling utilities for the application.
  */
 
+#include <stdarg.h>  // For handling variable arguments in functions
+#include <stdio.h>   // For snprintf, printf
 #include <string.h>  // For string manipulation
-#include <stdio.h>   // For snprintf
-#include <stdbool.h> // For boolean support
 #include "error.h"
 #include "ui.h"      // For sending console messages
 
-/**
- * @brief Handle errors based on the provided error code and optional additional information.
+/* -----------------------------------------------------------------------------
+   Error Table
+   -------------------------------------------------------------------------- */
+
+/*
+ * error.c
  *
- * Generates a detailed error message string and logs it to the console.
- * Critical errors invoke the system's main error handler.
- *
- * @param error_code The error code indicating the type of error.
- * @param additional_info Optional additional information to provide more context for the error.
+ * Implements error handling utilities for the application.
  */
-void user_error_handler(uint8_t error_code, const char *additional_info) {
-    // Constants
-    const char *error_prefix = "ER";              // Prefix for all error messages
-    char error_msg[MAX_ERROR_STRING_LENGTH] = ""; // Buffer for the base error message
-    char error_msg_final[MAX_ERROR_STRING_LENGTH] = ""; // Buffer for the full error message
-    bool call_main_error_handler = true;          // Flag to decide whether to invoke the main handler
 
-    // Step 1: Determine the base error message based on the error code
-    switch (error_code) {
-        case ERROR_CAN_MODULE_NOT_FOUND:
-            strncpy(error_msg, "CAN module not found", sizeof(error_msg) - 1);
-            break;
-        case ERROR_MODULE_PID_NOT_FOUND:
-            strncpy(error_msg, "PID not found", sizeof(error_msg) - 1);
-            break;
-        case ERROR_CAN_INVALID_PAYLOAD:
-            strncpy(error_msg, "Invalid CAN payload", sizeof(error_msg) - 1);
-            break;
-        case ERROR_CAN_TRANSMIT_FAILED:
-            strncpy(error_msg, "CAN transmission failed", sizeof(error_msg) - 1);
-            break;
-        case ERROR_CAN_BUFFER_OVERFLOW:
-            strncpy(error_msg, "CAN buffer overflow", sizeof(error_msg) - 1);
-            break;
-        case ERROR_CAN_FILTER_CONFIG_FAILED:
-            strncpy(error_msg, "CAN filter configuration failed", sizeof(error_msg) - 1);
-            break;
-        case ERROR_CAN_INIT_FAILED:
-            strncpy(error_msg, "CAN initialization failed", sizeof(error_msg) - 1);
-            break;
-        case ERROR_CAN_NOTIFICATION_FAILED:
-            strncpy(error_msg, "CAN notification setup failed", sizeof(error_msg) - 1);
-            break;
-        case ERROR_CAN_RETRIEVE_FAILED:
-            strncpy(error_msg, "CAN retrieve failed", sizeof(error_msg) - 1);
-            break;
-        case ERROR_CAN_PACKET_NULL:
-            strncpy(error_msg, "Null CAN packet", sizeof(error_msg) - 1);
-            break;
-        case ERROR_CAN_DATA_PARSE_FAILED:
-            strncpy(error_msg, "Failed to parse CAN data", sizeof(error_msg) - 1);
-            break;
-        case ERROR_CAN_DEVICE_NOT_FOUND:
-            strncpy(error_msg, "No matching CAN device", sizeof(error_msg) - 1);
-            break;
-        case ERROR_CAN_PID_NOT_FOUND:
-            strncpy(error_msg, "No matching PID for CAN device", sizeof(error_msg) - 1);
-            break;
-        case ERROR_NO_ERROR:
-            call_main_error_handler = false; // No error, do not call main handler
-            break;
-        case ERROR_CAN_QUEUE_FULL:
-            strncpy(error_msg, "CAN message queue full", sizeof(error_msg) - 1);
-            break;
-        case ERROR_CAN_QUEUE_INIT_FAILED:
-        	strncpy(error_msg, "CAN queue init fail", sizeof(error_msg) - 1);
-        	break;
-        default:
-            strncpy(error_msg, "Unknown error", sizeof(error_msg) - 1);
-            break;
+#include <stdarg.h>
+#include <stdio.h>
+#include <string.h>
+#include "error.h"
+#include "ui.h"
+
+/* -----------------------------------------------------------------------------
+   Error Table
+   -------------------------------------------------------------------------- */
+
+ErrorEntry error_table[] = {
+    // General Errors (0-99)
+    {ERROR_NO_ERROR,                "No error occurred",                   ERROR_CATEGORY_GENERAL, ERROR_SEVERITY_INFO,       0},
+    {ERROR_INVALID_ARGUMENT,        "Invalid function argument",           ERROR_CATEGORY_GENERAL, ERROR_SEVERITY_WARNING,    0},
+    {ERROR_UNKNOWN,                 "Unknown error occurred",              ERROR_CATEGORY_GENERAL, ERROR_SEVERITY_CRITICAL,   0},
+
+    // CAN-Related Errors (100-199)
+    {ERROR_CAN_MODULE_NOT_FOUND,    "CAN module not found",                ERROR_CATEGORY_CAN,     ERROR_SEVERITY_CRITICAL,   0},
+    {ERROR_MODULE_PID_NOT_FOUND,    "PID not found",                       ERROR_CATEGORY_CAN,     ERROR_SEVERITY_WARNING,    0},
+    {ERROR_CAN_TRANSMIT_FAILED,     "CAN transmission failed",             ERROR_CATEGORY_CAN,     ERROR_SEVERITY_WARNING,    0},
+    {ERROR_CAN_INVALID_PAYLOAD,     "Invalid CAN payload",                 ERROR_CATEGORY_CAN,     ERROR_SEVERITY_WARNING,    0},
+    {ERROR_CAN_BUFFER_OVERFLOW,     "CAN buffer overflow",                 ERROR_CATEGORY_CAN,     ERROR_SEVERITY_CRITICAL,   0},
+    {ERROR_CAN_RETRIEVE_FAILED,     "CAN retrieve failed",                 ERROR_CATEGORY_CAN,     ERROR_SEVERITY_WARNING,    0},
+    {ERROR_CAN_QUEUE_FULL,          "CAN message queue full",              ERROR_CATEGORY_CAN,     ERROR_SEVERITY_WARNING,    0},
+    {ERROR_CAN_PACKET_NULL,         "Null CAN packet",                     ERROR_CATEGORY_CAN,     ERROR_SEVERITY_WARNING,    0},
+    {ERROR_CAN_DATA_PARSE_FAILED,   "CAN data parsing failed",             ERROR_CATEGORY_CAN,     ERROR_SEVERITY_WARNING,    0},
+    {ERROR_CAN_DEVICE_NOT_FOUND,    "CAN device not found",                ERROR_CATEGORY_CAN,     ERROR_SEVERITY_CRITICAL,   0},
+    {ERROR_CAN_PID_NOT_FOUND,       "CAN PID not found",                   ERROR_CATEGORY_CAN,     ERROR_SEVERITY_WARNING,    0},
+    {ERROR_CAN_INIT_FAILED,         "CAN initialization failed",           ERROR_CATEGORY_CAN,     ERROR_SEVERITY_CRITICAL,   0},
+    {ERROR_CAN_NOTIFICATION_FAILED, "CAN notification activation failed",  ERROR_CATEGORY_CAN,     ERROR_SEVERITY_CRITICAL,   0},
+	{ERROR_CAN_FILTER_CONFIG_FAILED,"Failed to apply CAN filter",          ERROR_CATEGORY_CAN,     ERROR_SEVERITY_CRITICAL,   0},
+	{ERROR_CAN_INVALID_PACKET, 		"Invalid CAN packet", 				   ERROR_CATEGORY_CAN, 	   ERROR_SEVERITY_WARNING,    0},
+	{ERROR_CAN_PACKET_NOT_FOUND, 	"CAN packet not found", 			   ERROR_CATEGORY_CAN, 	   ERROR_SEVERITY_WARNING,    0},
+
+	// RTOS-Related Errors (200-299)
+    {ERROR_RTOS_QUEUE_INIT_FAILED,  "RTOS queue initialization failed",    ERROR_CATEGORY_RTOS,    ERROR_SEVERITY_CRITICAL,   0},
+    {ERROR_RTOS_QUEUE_FULL,         "RTOS queue full",                     ERROR_CATEGORY_RTOS,    ERROR_SEVERITY_WARNING,    0},
+    {ERROR_RTOS_MUTEX_TIMEOUT,      "RTOS mutex acquisition timed out",    ERROR_CATEGORY_RTOS,    ERROR_SEVERITY_CRITICAL,   0},
+    {ERROR_RTOS_MUTEX_RELEASE_FAILED, "Failed to release packet pool mutex", ERROR_CATEGORY_RTOS,  ERROR_SEVERITY_WARNING,    0},
+
+    // UI-Related Errors (300-399)
+    {ERROR_UI_RENDER_FAILED,        "UI rendering failed",                 ERROR_CATEGORY_UI,      ERROR_SEVERITY_WARNING,    0},
+    {ERROR_UI_LOGGING_FAILED,       "Logging system failed",               ERROR_CATEGORY_UI,      ERROR_SEVERITY_WARNING,    0},
+
+    // Storage-Related Errors (400-499)
+    {ERROR_STORAGE_WRITE_FAILED,    "Failed to write to persistent storage", ERROR_CATEGORY_STORAGE, ERROR_SEVERITY_CRITICAL, 0},
+    {ERROR_STORAGE_READ_FAILED,     "Failed to read from persistent storage", ERROR_CATEGORY_STORAGE, ERROR_SEVERITY_WARNING,  0},
+
+    // New CAN Context Errors (500-599)
+    {ERROR_CAN_QUEUE_UNAVAILABLE,   "Queue unavailable for CAN instance",  ERROR_CATEGORY_CAN,     ERROR_SEVERITY_WARNING,    0},
+    {ERROR_CAN_INVALID_CONTEXT,     "Invalid CAN context in callback",     ERROR_CATEGORY_CAN,     ERROR_SEVERITY_CRITICAL,   0},
+};
+
+
+
+// Number of entries in the error table
+const size_t error_table_size = sizeof(error_table) / sizeof(error_table[0]);
+
+
+
+
+/* -----------------------------------------------------------------------------
+   Functions
+   -------------------------------------------------------------------------- */
+
+/**
+ * @brief Retrieve the error message corresponding to an error code.
+ *
+ * This function searches the error table for a matching error code
+ * and returns the associated error message. If the error code is not found,
+ * it returns a default "Unknown error" message.
+ *
+ * @param error_code The error code to look up.
+ * @return const char* Pointer to the error message string.
+ */
+const char *get_error_message(ErrorCodes error_code) {
+    // Search for the error code in the error table
+    for (size_t i = 0; i < sizeof(error_table) / sizeof(ErrorEntry); i++) {
+        if (error_table[i].code == error_code) {
+            return error_table[i].message; // Return the associated message
+        }
     }
 
-    // Step 2: Construct the full error message
-    int result = snprintf(
-        error_msg_final, sizeof(error_msg_final), "%s#%u: %s%s%s",
-        error_prefix,                      // Prefix for error messages (e.g., "ER")
-        (uint8_t)error_code,               // The numeric error code
-        error_msg,                         // The base error message
-        additional_info ? " - " : "",      // Separator if additional info is provided
-        additional_info ? additional_info : "" // Additional context for the error
-    );
+    // Return a default message if the error code is not found
+    return "Unknown error code";
+}
 
-    // Handle potential truncation
-    if (result < 0 || result >= (int)sizeof(error_msg_final)) {
-        strncpy(error_msg_final, "Truncated error message", sizeof(error_msg_final) - 1);
-        error_msg_final[sizeof(error_msg_final) - 1] = '\0';
+/**
+ * @brief Handles an error, logs it, and optionally invokes the system error handler.
+ */
+void user_error_handler(ErrorCodes error_code, const char *format, ...) {
+    char error_msg[MAX_ERROR_STRING_LENGTH] = "";  // Buffer for formatted error message
+    va_list args;                                  // Variable argument list
+
+    // Retrieve the error entry and increment its occurrence count
+    ErrorEntry *entry = NULL;
+    for (size_t i = 0; i < sizeof(error_table) / sizeof(ErrorEntry); i++) {
+        if (error_table[i].code == error_code) {
+            entry = &error_table[i];
+            entry->count++; // Increment occurrence counter
+            break;
+        }
     }
 
-    // Step 3: Log the error message
-    send_console_msg(error_msg_final);
+    // Format additional context (if provided)
+    if (format) {
+        va_start(args, format);
+        vsnprintf(error_msg, sizeof(error_msg), format, args);
+        va_end(args);
+    }
 
-    // Step 4: Call the main error handler if necessary
-    if (call_main_error_handler) {
+    // Log the error to the console with category and severity
+    printf("ER#%u [%s] (%s): %s%s%s\n",
+           error_code,
+           entry ? (entry->category == ERROR_CATEGORY_CAN ? "CAN" :
+                    entry->category == ERROR_CATEGORY_RTOS ? "RTOS" :
+                    entry->category == ERROR_CATEGORY_STORAGE ? "Storage" :
+                    entry->category == ERROR_CATEGORY_UI ? "UI" : "General") : "Unknown",
+           entry ? (entry->severity == ERROR_SEVERITY_CRITICAL ? "CRITICAL" :
+                    entry->severity == ERROR_SEVERITY_WARNING ? "WARNING" : "INFO") : "Unknown",
+           entry ? entry->message : "Error Unknown",
+           format ? " - " : "",
+           format ? error_msg : "");
+
+    // Log the error to persistent storage
+    log_error_to_storage(error_code, format ? error_msg : NULL);
+
+    // Invoke the main error handler for critical errors
+    if (entry && entry->severity == ERROR_SEVERITY_CRITICAL) {
         Error_Handler();
     }
+}
+
+/**
+ * @brief Logs the error to persistent storage.
+ */
+void log_error_to_storage(ErrorCodes error_code, const char *context) {
+    // Example: Save the error to persistent storage (e.g., SD card or EEPROM)
+    printf("Persisting error: Code=%u, Context=%s\n", error_code, context ? context : "None");
+    // TODO: Implement actual storage logic here
 }

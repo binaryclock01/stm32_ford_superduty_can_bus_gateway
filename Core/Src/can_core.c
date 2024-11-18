@@ -10,6 +10,7 @@
  * device and PID configurations.
  */
 
+#include <can_core.h>
 #include "device_configs.h"  // Include configurations for CAN devices
 #include <string.h>          // For memcpy
 #include <stdio.h>           // For printf
@@ -19,12 +20,11 @@
 
 #include "main.h"            // For HAL_CAN and other core includes
 #include "ssd1306.h"         // For OLED display functions
-#include "ui.h"              // For console message utilities
+//#include "ui.h"              // For console message utilities
 #include "utils.h"           // For helper functions like bytes_to_uint32
 #include "error.h"           // For error handling utilities
-#include "can.h"
-#include "cmsis_os.h"        // RTOS CMSIS types, such as osMutedId_t
-
+#include <cmsis_os.h>        // RTOS CMSIS types, such as osMutedId_t
+#include <rtos.h>
 
 /* -----------------------------------------------------------------------------
    Function Definitions
@@ -32,98 +32,52 @@
 
 #define CHAR_BIT 8
 
-static CANPacketPoolEntry can_packet_pool[CAN_PACKET_POOL_SIZE];
-static osMutexId_t packet_pool_mutex;  // Mutex to protect pool access
-
-static CANBuffer can_buffers[CAN_TOTAL] = {
-    {.head = 0, .tail = 0, .count = 0}, // CAN_TRUCK buffer
-    {.head = 0, .tail = 0, .count = 0}  // CAN_AUX buffer
-};
-
 // Create an array of CAN handles
 CAN_HandleTypeDef *can_handles[] = {
     &hcan1, // Index 0 for CAN1
     &hcan2  // Index 1 for CAN2
 };
 
-CANData can_data[CAN_TOTAL] = {
-	{ .name = "TruckNet", .rx_count = 0, .tx_count = 0 },
-    { .name = "AuxNet", .rx_count = 0, .tx_count = 0 }
-};
-
-void init_can_packet_pool(void) {
-    for (int i = 0; i < CAN_PACKET_POOL_SIZE; i++) {
-        can_packet_pool[i].used = 0;
+/**
+ * @brief Retrieve the CAN handle for the given CAN instance.
+ *
+ * This function maps a `CANInstance` enumeration value to its corresponding
+ * `CAN_HandleTypeDef`. It provides a way to retrieve the appropriate hardware
+ * CAN handle based on the logical instance (e.g., `CAN_TRUCK`, `CAN_AUX`).
+ *
+ * @param instance The `CANInstance` to retrieve the handle for.
+ * @return CAN_HandleTypeDef* Pointer to the corresponding CAN hardware handle,
+ *         or NULL if the instance is invalid.
+ */
+CAN_HandleTypeDef *get_can_handle_from_instance(CANInstance instance) {
+    switch (instance) {
+        case CAN_TRUCK:
+            return &hcan1; // Replace with actual CAN handle for CAN_TRUCK
+        case CAN_AUX:
+            return &hcan2; // Replace with actual CAN handle for CAN_AUX
+        default:
+            // Log an error for an invalid instance
+            char error_msg[64];
+            snprintf(error_msg, sizeof(error_msg), "Invalid CAN instance: %d", instance);
+            user_error_handler(ERROR_CAN_INVALID_CONTEXT, error_msg);
+            return NULL;
     }
-    packet_pool_mutex = osMutexNew(NULL);
-}
-
-CANPacket *allocate_can_packet(void) {
-    osMutexAcquire(packet_pool_mutex, osWaitForever);
-    for (int i = 0; i < CAN_PACKET_POOL_SIZE; i++) {
-        if (can_packet_pool[i].used == 0) {
-            can_packet_pool[i].used = 1;
-            osMutexRelease(packet_pool_mutex);
-            return &can_packet_pool[i].packet;
-        }
-    }
-    osMutexRelease(packet_pool_mutex);
-    return NULL;  // Pool is full
-}
-
-void free_can_packet(CANPacket *packet) {
-    osMutexAcquire(packet_pool_mutex, osWaitForever);
-    for (int i = 0; i < CAN_PACKET_POOL_SIZE; i++) {
-        if (&can_packet_pool[i].packet == packet) {
-            can_packet_pool[i].used = 0;
-            break;
-        }
-    }
-    osMutexRelease(packet_pool_mutex);
 }
 
 /**
- * @brief Get the message queue handle for a given CAN hardware instance.
+ * @brief Retrieves the CAN instance for the given hardware instance.
+ *
  * @param hcan Pointer to the CAN hardware instance (e.g., CAN1 or CAN2).
- * @return osMessageQueueId_t* Pointer to the corresponding message queue handle, or NULL if not found.
+ * @return CANInstance Enum value representing the CAN instance (e.g., CAN_TRUCK or CAN_AUX).
+ *         Returns CAN_TOTAL (invalid) if the instance is unknown.
  */
-osMessageQueueId_t* get_queue_handle_from_hcan(CAN_HandleTypeDef *hcan)
-{
+CANInstance get_can_instance_enum(CAN_HandleTypeDef *hcan) {
     if (hcan == &hcan1) {
-        return &CAN1_Rx_QueueHandle;
+        return CAN_TRUCK;
     } else if (hcan == &hcan2) {
-        return &CAN2_Rx_QueueHandle;
-    } else {
-        return NULL; // Unknown CAN instance
+        return CAN_AUX;
     }
-}
-
-bool enqueue_can_packet(CANInstance can_instance, const CANPacket *packet) {
-    CANBuffer *buffer = &can_buffers[can_instance];
-
-    if (buffer->count >= CAN_BUFFER_SIZE) {
-        // Buffer overflow; handle error or discard packet
-        return false;
-    }
-
-    buffer->packets[buffer->head] = *packet; // Add packet to the buffer
-    buffer->head = (buffer->head + 1) % CAN_BUFFER_SIZE;
-    buffer->count++;
-    return true;
-}
-
-bool dequeue_can_packet(CANInstance can_instance, CANPacket *packet) {
-    CANBuffer *buffer = &can_buffers[can_instance];
-
-    if (buffer->count == 0) {
-        // Buffer is empty
-        return false;
-    }
-
-    *packet = buffer->packets[buffer->tail]; // Retrieve the next packet
-    buffer->tail = (buffer->tail + 1) % CAN_BUFFER_SIZE;
-    buffer->count--;
-    return true;
+    return CAN_TOTAL; // Invalid CAN instance
 }
 
 /**
@@ -136,7 +90,7 @@ bool dequeue_can_packet(CANInstance can_instance, CANPacket *packet) {
  * @param pid Pointer to the CANDevicePID representing the PID to request.
  * @return uint64_t The constructed 64-bit CAN request payload.
  */
-uint64_t build_can_request(CANDeviceConfig *device, CANDevicePID *pid) {
+uint64_t build_can_tx_read_data_request(CANDeviceConfig *device, CANDevicePID *pid) {
     uint64_t uint64_payload = 0;
 
     // Validate inputs
@@ -165,17 +119,17 @@ uint64_t build_can_request(CANDeviceConfig *device, CANDevicePID *pid) {
 }
 
 /**
- * @brief Setup the CAN Tx header with the given request ID.
+ * @brief Configure the CAN Tx header.
  *
- * Initializes the CAN Tx header structure with standard values, including the
- * request ID, identifier type, frame type, and data length.
+ * Sets up the CAN transmission header with the specified request ID and default values
+ * for the identifier type, data length code (DLC), and other metadata.
  *
- * @param TxHeader Pointer to the CAN_TxHeaderTypeDef structure to configure.
- * @param request_id The request ID to be set in the header (Standard Identifier).
+ * @param txheader Pointer to the CAN_TxHeaderTypeDef structure to populate.
+ * @param request_id The request ID for the CAN message.
  */
-void setup_can_tx_header(CAN_TxHeaderTypeDef *TxHeader, uint64_t request_id) {
+void setup_can_tx_header(CAN_TxHeaderTypeDef *TxHeader, uint32_t std_id) {
     *TxHeader = (CAN_TxHeaderTypeDef){
-        .StdId = request_id,                 // Set the standard identifier for the CAN message
+        .StdId = std_id,                     // Set the standard identifier for the CAN message
         .IDE = CAN_ID_STD,                   // Use standard identifier (11-bit)
         .RTR = CAN_RTR_DATA,                 // Specify a data frame (not a remote frame)
         .DLC = MAX_DLC_BYTE_LENGTH,          // Set the Data Length Code to the maximum allowed
@@ -193,8 +147,8 @@ void setup_can_tx_header(CAN_TxHeaderTypeDef *TxHeader, uint64_t request_id) {
  * @param pid Pointer to the CANDevicePID specifying the requested PID.
  * @param TxData Pointer to the data buffer where the payload will be stored.
  */
-void generate_can_tx_payload(CANDeviceConfig *device, CANDevicePID *pid, uint8_t *TxData) {
-    uint64_t request_payload = build_can_request(device, pid); // Build the payload using custom logic
+void generate_can_tx_read_data_payload(CANDeviceConfig *device, CANDevicePID *pid, uint8_t *TxData) {
+    uint64_t request_payload = build_can_tx_read_data_request(device, pid); // Build the payload using custom logic
     request_payload = __builtin_bswap64(request_payload);      // Convert to big-endian if required
     memcpy(TxData, &request_payload, MAX_DLC_BYTE_LENGTH);     // Copy payload into TxData buffer
 }
@@ -222,29 +176,6 @@ void log_can_message(uint64_t request_id, uint8_t *TxData, uint8_t dlc) {
 
 
 /**
- * @brief Send a CAN data packet. Typically called by a higher level function.
- *
- * THIS IS A LOWER LEVEL FUNCTION DENOTED BY _function
- *
- * Typically you want to use the function "send_can_request" if you are trying to send a CAN
- * request as that uses the internal can device and PIDs to build the packet correctly.
- *
- * This function sends a CAN message using the specified CAN data structure, which includes
- * the Tx header, data buffer, and mailbox. Handles errors by invoking the
- * error handler and logging an error message.
- *
- * @param hcan Pointer to the CAN hardware instance (e.g., CAN1 or CAN2).
- * @param can_data Pointer to the CANData structure containing transmission details.
- * @return true if the message was transmitted successfully, false otherwise.
- */
-bool _send_can_packet(CAN_HandleTypeDef *hcan, CANData *can_data) {
-    if (HAL_CAN_AddTxMessage(hcan, &can_data->TxHeader, can_data->TxData, &can_data->TxMailbox) != HAL_OK) {
-        user_error_handler(ERROR_CAN_TRANSMIT_FAILED, "Failed to send CAN packet");
-        return false;
-    }
-    return true;
-}
-/**
  * @brief Prepare and send a CAN request for a specific device and PID.
  *
  * This function handles the entire process of preparing and sending a CAN message.
@@ -255,44 +186,42 @@ bool _send_can_packet(CAN_HandleTypeDef *hcan, CANData *can_data) {
  * @param device Pointer to the CANDeviceConfig representing the target device.
  * @param pid Pointer to the CANDevicePID specifying the requested PID.
  */
-void send_can_request(CANInstance can_instance, CANDeviceConfig *device, CANDevicePID *pid) {
-    // Step 1: Retrieve the request ID
-    // The request ID uniquely identifies the CAN message for the target device.
-    // This is typically derived from the device's CAN ID.
-    uint64_t request_id = get_request_id(device->can_id);
+void send_can_tx_request(CANInstance can_instance, CANDeviceConfig *device, CANDevicePID *pid) {
+    // Step 1: Declare a CAN_Packet structure
+    // This structure encapsulates the header, metadata, and payload for transmission.
+    CAN_Packet packet;
 
-    // Step 2: Access the CAN data and hardware handle
-    // Retrieve the CANData structure (e.g., TxHeader, TxData) for the specified instance.
-    // Also, select the appropriate hardware handle (e.g., hcan1, hcan2) for transmission.
-    CANData *selected_can = &can_data[can_instance];
-    CAN_HandleTypeDef *selected_hcan_instance = can_handles[can_instance];
+    // Step 2: Set up the CAN Tx header
+    // Retrieve the request ID, which uniquely identifies the message for the target device.
+    // Populate the TxHeader with the request ID, data length, and other metadata.
+    uint32_t request_id = get_request_id(device->can_id);  // `get_request_id` now returns uint32_t
+    setup_can_tx_header((CAN_TxHeaderTypeDef *)&packet.header, request_id);  // Encapsulated logic for header setup
 
-    // Step 3: Configure the CAN Tx header
-    // The header defines metadata for the CAN message, including the request ID,
-    // identifier type, and data length code (DLC).
-    setup_can_tx_header(&selected_can->TxHeader, request_id);
+    // Step 3: Populate metadata
+    // Metadata provides additional information about the packet, such as the CAN instance
+    // and the timestamp for debugging and analysis.
+    packet.meta.can_instance = can_instance;
+    packet.meta.timestamp = HAL_GetTick();  // Use HAL_GetTick() to capture the system time in ms
 
     // Step 4: Generate the CAN payload
-    // The payload is constructed based on the target device and the requested PID.
-    // This includes encoding the payload in a format suitable for transmission.
-    generate_can_tx_payload(device, pid, selected_can->TxData);
+    // This function creates the payload specific to the target device and PID.
+    // It encodes the payload in a format suitable for transmission on the CAN network.
+    generate_can_tx_read_data_payload(device, pid, packet.payload);
 
-    // Step 5: Transmit the CAN message
-    // Use the hardware CAN handle and the configured CANData structure to send the message.
-    // If transmission fails, log an error and exit the function.
-    if (!_send_can_packet(selected_hcan_instance, selected_can)) {
-        return; // Exit on transmission failure
+    // Step 5: Enqueue the packet for asynchronous transmission
+    // Messages are added to the Tx queue for processing by the Tx task.
+    // This ensures non-blocking operation and better handling of real-time constraints.
+    if (osMessageQueuePut(Tx_QueueHandle, &packet, 0, 0) != osOK) {
+        user_error_handler(ERROR_CAN_TRANSMIT_FAILED, "Failed to enqueue CAN packet");
+        return;  // Exit if enqueuing fails
     }
 
-    // Step 6: Update transmission statistics
-    // Increment the transmission counter for the selected CAN instance to track activity.
-    selected_can->tx_count++;
-
-    // Step 7: Log the transmitted message
-    // Generate a human-readable log of the transmitted message, including the request ID
-    // and the raw payload data, for debugging purposes.
-    log_can_message(request_id, selected_can->TxData, selected_can->TxHeader.DLC);
+    // Step 6: Log the message
+    // After enqueuing, log the request ID, payload, and DLC for debugging purposes.
+    // This helps in tracing and validating the transmitted data.
+    log_can_message(request_id, packet.payload, packet.header.dlc);
 }
+
 
 
 
@@ -309,7 +238,7 @@ void send_all_requests(void) {
 
         for (size_t pid_index = 0; pid_index < device->pid_count; pid_index++) {
             CANDevicePID *pid = &device->pids[pid_index];
-            send_can_request(CAN_TRUCK, device, pid);
+            send_can_tx_request(CAN_TRUCK, device, pid);
         }
     }
 }
@@ -390,66 +319,160 @@ void process_signal_changes(CANDevicePID *device_pid, uint32_t payload) {
 }
 
 /**
- * @brief Retrieve a CAN message and populate a CANPacket for the specified CAN instance.
+ * @brief Translates a HAL CAN Rx header into the unified CAN_Header format.
  *
- * This function attempts to retrieve a message from the CAN FIFO0 buffer and stores
- * the data into a CANPacket, which can then be queued or processed further.
+ * This function maps fields from the HAL `CAN_RxHeaderTypeDef` structure
+ * into the application's unified `CAN_Header` format for consistency across
+ * Rx and Tx operations.
+ *
+ * @param hal_rx_header Pointer to the HAL CAN Rx header.
+ * @param header Pointer to the unified `CAN_Header` structure to populate.
+ */
+void normalize_rx_hal_header(const CAN_RxHeaderTypeDef *hal_rx_header, CAN_Header *header) {
+    if (hal_rx_header == NULL || header == NULL) {
+        user_error_handler(ERROR_CAN_INVALID_CONTEXT, "NULL pointer passed to translate_rx_header");
+        return;
+    }
+
+    header->id = (hal_rx_header->IDE == CAN_ID_EXT) ? hal_rx_header->ExtId : hal_rx_header->StdId;
+    header->dlc = hal_rx_header->DLC;
+    header->is_extended_id = (hal_rx_header->IDE == CAN_ID_EXT);
+    header->is_remote_frame = (hal_rx_header->RTR == CAN_RTR_REMOTE);
+    header->filter_match = hal_rx_header->FilterMatchIndex;
+    header->timestamp = hal_rx_header->Timestamp;
+}
+
+
+/**
+ * @brief Retrieve a CAN message from FIFO0 and populate a CAN_Packet.
+ *
+ * Retrieves a CAN message from FIFO0 using the HAL CAN driver, validates
+ * the message, translates the header into a unified format, and populates
+ * the provided `CAN_Packet` structure.
  *
  * @param hcan Pointer to the CAN hardware handle (e.g., CAN1 or CAN2).
  * @param can_instance The CAN instance (e.g., CAN_TRUCK or CAN_AUX).
- * @param packet Pointer to a CANPacket where the retrieved data will be stored.
- * @return true if the message was successfully retrieved, false otherwise.
+ * @param packet Pointer to the `CAN_Packet` where the received message will be stored.
+ * @return true if the message was successfully retrieved and valid, false otherwise.
  */
-bool retrieve_can_message(CAN_HandleTypeDef *hcan, CANInstance can_instance, CANPacket *packet) {
-    if (packet == NULL) {
-        // Log and return error if the provided packet pointer is NULL
-        user_error_handler(ERROR_CAN_PACKET_NULL, "CANPacket pointer is NULL");
+bool get_rx_message_from_CAN_RX_FIFO0(CAN_HandleTypeDef *hcan, CANInstance can_instance, CAN_Packet *packet) {
+    // Step 1: Validate `hcan`.
+    if (hcan == NULL) {
+        user_error_handler(ERROR_CAN_INVALID_CONTEXT, "NULL CAN_HandleTypeDef provided to get_rx_message_from_CAN_RX_FIFO0");
         return false;
     }
 
-    // Attempt to retrieve the CAN message from FIFO0
-    HAL_StatusTypeDef hal_status = HAL_CAN_GetRxMessage(
-        hcan, CAN_RX_FIFO0, &packet->header, packet->data
-    );
-
-    if (hal_status != HAL_OK) {
-        // Log an error if message retrieval fails
-        user_error_handler(ERROR_CAN_RETRIEVE_FAILED, "Failed to retrieve CAN message");
-        return false; // Indicate failure
+    // Step 2: Validate `packet`.
+    if (packet == NULL) {
+        user_error_handler(ERROR_CAN_PACKET_NULL, "NULL CAN_Packet provided to get_rx_message_from_CAN_RX_FIFO0");
+        return false;
     }
 
-    // Populate additional packet fields
-    packet->can_instance = can_instance;
-    packet->timestamp = HAL_GetTick(); // Add a timestamp for when the packet was received
+    // Step 3: Declare a temporary HAL CAN Rx header for retrieval.
+    CAN_RxHeaderTypeDef hal_rx_header;
 
-    return true; // Indicate success
+    // Step 4: Retrieve the CAN message from FIFO0.
+    HAL_StatusTypeDef hal_status = HAL_CAN_GetRxMessage(
+        hcan,
+        CAN_RX_FIFO0,
+        &hal_rx_header, // HAL Rx header
+        packet->payload // Data payload buffer
+    );
+
+    // Step 5: Check HAL status.
+    if (hal_status != HAL_OK) {
+        char error_msg[64];
+        snprintf(error_msg, sizeof(error_msg), "HAL_CAN_GetRxMessage failed with status: %d", hal_status);
+        user_error_handler(ERROR_CAN_RETRIEVE_FAILED, error_msg);
+        return false;
+    }
+
+    // Step 6: Validate DLC.
+    if (hal_rx_header.DLC > DLC_MAX) {
+        char error_msg[64];
+        snprintf(error_msg, sizeof(error_msg), "Invalid DLC value: %ld in received CAN message", hal_rx_header.DLC);
+        user_error_handler(ERROR_CAN_INVALID_PAYLOAD, error_msg);
+        return false;
+    }
+
+    // Step 7: Translate the HAL Rx header into the unified CAN_Header format.
+    normalize_rx_hal_header(&hal_rx_header, &packet->header);
+
+    // Step 8: Populate packet metadata.
+    packet->flow = PACKET_RX;
+    packet->meta.can_instance = can_instance;
+    packet->meta.timestamp = HAL_GetTick();
+
+    // Step 9: Log the raw CAN message for debugging.
+    log_raw_can_packet(packet);
+
+    // Step 10: Return success.
+    return true;
 }
 
 /**
- * @brief Log the raw incoming CAN message for debugging purposes.
+ * @brief Logs a raw CAN packet in a human-readable format.
  *
- * Logs the CAN ID and raw data bytes in a human-readable format.
+ * This function formats the metadata, CAN ID, DLC, and payload of a CAN packet
+ * into a single log message for debugging purposes.
  *
- * @param can_number The CAN instance (e.g., CAN_TRUCK or CAN_AUX).
+ * @param packet Pointer to the `CAN_Packet` containing the received message.
  */
-
-void log_raw_can_data(CANInstance can_instance) {
-    char log_msg[128] = {0};
-
-    snprintf(log_msg, sizeof(log_msg), "Raw CAN%d: ID=0x%" PRIX32 " Data=",
-             can_instance, can_data[can_instance].RxHeader.StdId);
-
-    // Append data bytes to the message
-    size_t offset = strlen(log_msg);
-    for (uint8_t i = 0; i < can_data[can_instance].RxHeader.DLC; i++) {
-        snprintf(&log_msg[offset], sizeof(log_msg) - offset, "%02X ",
-                 can_data[can_instance].RxData[i]);
-        offset = strlen(log_msg);
+void log_raw_can_packet(const CAN_Packet *packet) {
+    // Step 1: Validate the input packet
+    if (packet == NULL) {
+        user_error_handler(ERROR_CAN_PACKET_NULL, "Null CAN_Packet provided to log_raw_can_packet.");
+        return;
     }
 
-    // Log the message
+    // Step 2: Extract header information
+    uint32_t can_id = packet->header.id;
+    uint8_t dlc = packet->header.dlc;
+
+    // Step 3: Validate the DLC to ensure it's within the allowable range
+    if (dlc > DLC_MAX) {
+        char error_msg[64];
+        snprintf(error_msg, sizeof(error_msg), "Invalid DLC=%d in CAN packet", dlc);
+        user_error_handler(ERROR_CAN_INVALID_PAYLOAD, error_msg);
+        return;
+    }
+
+    // Step 4: Initialize the log message buffer
+    char log_msg[128] = {0};
+
+    // Step 5: Format the log message with CAN instance, ID, and DLC
+    int result = snprintf(
+        log_msg, sizeof(log_msg),
+        "Raw CAN: Instance=%d, ID=0x%" PRIX32 ", DLC=%d, Data=",
+        packet->meta.can_instance, can_id, dlc
+    );
+
+    // Step 6: Check for formatting errors
+    if (result < 0 || result >= (int)sizeof(log_msg)) {
+        user_error_handler(ERROR_UI_LOGGING_FAILED, "Log message construction failed in log_raw_can_packet.");
+        return;
+    }
+
+    // Step 7: Append payload data to the log message
+    size_t offset = strlen(log_msg);
+    for (uint8_t i = 0; i < dlc; i++) {
+        if (offset >= sizeof(log_msg)) {
+            user_error_handler(ERROR_UI_LOGGING_FAILED, "Log message exceeded buffer size in log_raw_can_packet.");
+            return;
+        }
+        int append_result = snprintf(&log_msg[offset], sizeof(log_msg) - offset, "%02X ", packet->payload[i]);
+        if (append_result < 0) {
+            user_error_handler(ERROR_UI_LOGGING_FAILED, "Failed to append payload data to log message.");
+            return;
+        }
+        offset += append_result;
+    }
+
+    // Step 8: Log the complete message
     send_console_msg(log_msg);
 }
+
+
 
 
 /**
@@ -468,17 +491,17 @@ bool should_ignore_message(uint32_t can_id) {
  * @brief Parse raw CAN data into a structured format.
  *
  * This function extracts fields such as data length, PID, and payload
- * from a raw 8-byte CAN data array and populates a ParsedCANData structure.
+ * from a raw 8-byte CAN data array and populates a Parsed_CAN_Data structure.
  * It performs basic validation on the input pointers and reports errors
  * using the user error handler if necessary.
  *
  * @param raw_data Pointer to the raw CAN data array (8 bytes).
  *                 This data represents a single CAN message payload.
- * @param parsed_data Pointer to the ParsedCANData structure where the
+ * @param parsed_data Pointer to the Parsed_CAN_Data structure where the
  *                    parsed fields will be stored.
  * @return true if parsing was successful, false if input pointers were invalid.
  */
-bool parse_raw_can_data(const uint8_t *raw_data, ParsedCANData *parsed_data) {
+bool parse_raw_can_data(const uint8_t *raw_data, Parsed_CAN_Data *parsed_data) {
     // Validate input pointers to prevent null pointer dereference
     if (!raw_data || !parsed_data) {
         // Report the error and return failure
@@ -512,7 +535,7 @@ bool parse_raw_can_data(const uint8_t *raw_data, ParsedCANData *parsed_data) {
  * @param parsed_data Pointer to the parsed CAN data structure.
  * @return true if the data is valid, false otherwise.
  */
-bool validate_parsed_can_data(const ParsedCANData *parsed_data) {
+bool validate_parsed_can_data(const Parsed_CAN_Data *parsed_data) {
     if (parsed_data->data_length < 4 || parsed_data->data_length > 8) {
         user_error_handler(ERROR_CAN_INVALID_PAYLOAD, "Invalid data length");
         return false;
@@ -527,7 +550,7 @@ bool validate_parsed_can_data(const ParsedCANData *parsed_data) {
  *
  * @param parsed_data Pointer to the parsed CAN data structure.
  */
-void log_valid_can_data(const ParsedCANData *parsed_data) {
+void log_valid_can_data(const Parsed_CAN_Data *parsed_data) {
     char log_msg[128] = {0};
 
     // Use PRIX32 for portable handling of uint32_t in hexadecimal
@@ -538,6 +561,78 @@ void log_valid_can_data(const ParsedCANData *parsed_data) {
     // Log the message
     send_console_msg(log_msg);
 }
+
+/**
+ * @brief Processes and sends a CAN packet.
+ *
+ * This function handles the following:
+ * 1. Validates the provided CAN packet for correctness.
+ * 2. Identifies the appropriate CAN hardware interface (e.g., CAN1 or CAN2) based on the packet's metadata.
+ * 3. Converts the generalized CAN header to the HAL-specific Tx header format.
+ * 4. Transmits the CAN packet using the HAL CAN API.
+ * 5. Logs detailed transmission statistics, including transmission time and running average of all transmitted packets.
+ *
+ * @param packet Pointer to the `CAN_Packet` containing the metadata, unified header, and payload.
+ * @return true if the packet was successfully transmitted, false otherwise.
+ */
+bool process_and_send_can_tx_packet(CAN_Packet *packet) {
+    if (packet == NULL) {
+        user_error_handler(ERROR_INVALID_ARGUMENT, "Tx packet pointer is NULL");
+        return false;
+    }
+
+    // Step 1: Validate the CAN instance
+    CAN_HandleTypeDef *target_can = get_can_handle_from_instance(packet->meta.can_instance);
+    if (target_can == NULL) {
+        user_error_handler(ERROR_CAN_INVALID_CONTEXT, "Invalid CAN instance in Tx packet");
+        return false;
+    }
+
+    // Step 2: Convert the generalized header to the HAL Tx header format
+    CAN_TxHeaderTypeDef hal_tx_header = {
+        .StdId = packet->header.id,
+        .ExtId = packet->header.id,
+        .IDE = packet->header.is_extended_id ? CAN_ID_EXT : CAN_ID_STD,
+        .RTR = packet->header.is_remote_frame ? CAN_RTR_REMOTE : CAN_RTR_DATA,
+        .DLC = packet->header.dlc,
+        .TransmitGlobalTime = DISABLE // Default value for Tx header
+    };
+
+    // Step 3: Attempt to send the packet
+    HAL_StatusTypeDef status = HAL_CAN_AddTxMessage(
+        target_can,               // Target CAN interface
+        &hal_tx_header,           // HAL-specific Tx header
+        packet->payload,          // Payload data
+        NULL                      // Mailbox (NULL since we're not directly tracking mailboxes here)
+    );
+
+    if (status != HAL_OK) {
+        char error_msg[64];
+        snprintf(error_msg, sizeof(error_msg), "CAN Tx failed on instance: %d", packet->meta.can_instance);
+        user_error_handler(ERROR_CAN_TRANSMIT_FAILED, error_msg);
+        return false;
+    }
+
+    // Step 4: Calculate transmission time and update running average
+    uint32_t current_time = HAL_GetTick();
+    uint32_t transmission_time = current_time - packet->meta.timestamp;
+
+    static uint32_t tx_time_sum = 0;
+    static uint32_t tx_count = 0;
+
+    tx_time_sum += transmission_time;
+    tx_count++;
+
+    uint32_t avg_tx_time = tx_time_sum / tx_count;
+
+    char log_msg[64];
+    snprintf(log_msg, sizeof(log_msg), "CAN Tx success: Instance=%d, Time=%lu ms, Avg Time=%lu ms",
+             packet->meta.can_instance, transmission_time, avg_tx_time);
+    send_console_msg(log_msg);
+
+    return true;
+}
+
 
 // Define a mapping array to map hardware instances to CANInstance indexes
 CANInstance get_can_instance_from_hcan(CAN_HandleTypeDef *hcan) {
@@ -566,7 +661,7 @@ CANInstance get_can_instance_from_hcan(CAN_HandleTypeDef *hcan) {
  *
  * @param packet Pointer to the CANPacket structure containing the received data.
  */
-void process_can_packet(CANPacket *packet) {
+void process_can_rx_packet(CAN_Packet *packet) {
     // Step 1: Validate the input
     if (packet == NULL) {
         user_error_handler(ERROR_CAN_PACKET_NULL, "Received null CANPacket");
@@ -574,34 +669,42 @@ void process_can_packet(CANPacket *packet) {
     }
 
     // Step 2: Log the raw CAN data for debugging
-    log_raw_can_data(packet->can_instance);
+    log_raw_can_packet(packet);
 
     // Step 3: Check if the CAN message should be ignored
-    if (should_ignore_message(packet->header.StdId)) {
+    if (should_ignore_message(packet->header.id)) {
         return; // Exit early if the message is not relevant
     }
 
     // Step 4: Parse the raw CAN data into a structured format
-    ParsedCANData parsed_data;
-    parse_raw_can_data(packet->data, &parsed_data);
+    Parsed_CAN_Data parsed_data;
+    parse_raw_can_data(packet->payload, &parsed_data);
 
     // Step 5: Validate the parsed data
     if (!validate_parsed_can_data(&parsed_data)) {
-        user_error_handler(ERROR_CAN_DATA_PARSE_FAILED, "Invalid CAN data");
+        char error_msg[64];
+        snprintf(error_msg, sizeof(error_msg), "Invalid parsed CAN data: ID=0x%" PRIX32 ", PID=0x%X, DLC=%d",
+                 packet->header.id, parsed_data.pid, parsed_data.data_length);
+        user_error_handler(ERROR_CAN_DATA_PARSE_FAILED, error_msg);
         return; // Exit early if the data is invalid
     }
 
     // Step 6: Locate the device configuration for the CAN ID
-    CANDeviceConfig *device_config = get_device_config_by_id(packet->header.StdId);
+    CANDeviceConfig *device_config = get_device_config_by_id(packet->header.id);
     if (device_config == NULL) {
-        user_error_handler(ERROR_CAN_DEVICE_NOT_FOUND, "Device configuration not found for CAN ID");
+        char error_msg[64];
+        snprintf(error_msg, sizeof(error_msg), "Device configuration not found for CAN ID: 0x%" PRIX32, packet->header.id);
+        user_error_handler(ERROR_CAN_DEVICE_NOT_FOUND, error_msg);
         return; // Exit if no matching device configuration is found
     }
 
     // Step 7: Locate the PID configuration for the parsed PID
     CANDevicePID *pid_config = get_pid_by_id(device_config, parsed_data.pid);
     if (pid_config == NULL) {
-        user_error_handler(ERROR_CAN_PID_NOT_FOUND, "PID configuration not found for device");
+        char error_msg[64];
+        snprintf(error_msg, sizeof(error_msg), "PID configuration not found for device: ID=0x%" PRIX32 ", PID=0x%X",
+                 packet->header.id, parsed_data.pid);
+        user_error_handler(ERROR_CAN_PID_NOT_FOUND, error_msg);
         return; // Exit if no matching PID configuration is found
     }
 
@@ -632,9 +735,9 @@ void process_can_packet(CANPacket *packet) {
 /*
 void old_handle_incoming_can_packet(CANInstance can_instance) {
     // Step 1: Set up the selected CAN data
-    // Retrieve the CANData structure for the given instance.
+    // Retrieve the CAN_Bus_Data structure for the given instance.
     // This holds relevant information like the RxHeader and RxData buffers.
-    CANData *selected_can = &can_data[can_instance];
+    CAN_Bus_Data *selected_can = &can_data[can_instance];
 
     // Extract the CAN ID from the RxHeader for further processing.
     uint32_t can_id = selected_can->RxHeader.StdId;
@@ -660,7 +763,7 @@ void old_handle_incoming_can_packet(CANInstance can_instance) {
 
     // Step 5: Parse raw data into a usable format
     // Convert the raw bytes into structured fields: data length, PID, and payload.
-    ParsedCANData parsed_data;
+    Parsed_CAN_Data parsed_data;
     parse_raw_can_data(selected_can->RxData, &parsed_data);
 
     // Step 6: Validate the parsed data

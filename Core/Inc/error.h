@@ -1,9 +1,3 @@
-/*
- * error.h
- *
- * Provides error handling utilities for the application.
- */
-
 #ifndef ERROR_H
 #define ERROR_H
 
@@ -11,52 +5,104 @@
 extern "C" {
 #endif
 
-#include <stdint.h>  // For fixed-width integer types
-#include <stdbool.h> // For boolean support
+#include <stdint.h>
+#include <stdbool.h>
+#include "error.h"
 
 /* -----------------------------------------------------------------------------
-   Constants and Macros
+   Enumerations for Error Handling
    -------------------------------------------------------------------------- */
-
-#define MAX_ERROR_STRING_LENGTH 100 /**< Maximum length for error message strings */
-
-/* -----------------------------------------------------------------------------
-   Enumerations
-   -------------------------------------------------------------------------- */
+#define MAX_ERROR_STRING_LENGTH 255
 
 /**
- * @brief Enumeration of error codes used in the application.
+ * @brief Enum for error categories to classify errors logically.
  */
 typedef enum {
-    ERROR_NO_ERROR = 0,             /**< No error occurred */
-    ERROR_CAN_MODULE_NOT_FOUND,     /**< CAN module not found */
-    ERROR_MODULE_PID_NOT_FOUND,     /**< PID not found in module */
-    ERROR_CAN_TRANSMIT_FAILED,      /**< CAN transmission failure */
-    ERROR_CAN_INVALID_PAYLOAD,      /**< Invalid payload received */
-    ERROR_CAN_BUFFER_OVERFLOW,      /**< CAN buffer overflow error */
-    ERROR_CAN_FILTER_CONFIG_FAILED, /**< CAN filter configuration failed */
-    ERROR_CAN_INIT_FAILED,          /**< CAN initialization failed */
-    ERROR_CAN_NOTIFICATION_FAILED,  /**< CAN notification setup failed */
-    ERROR_CAN_RETRIEVE_FAILED,      /**< CAN message retrieval failed */
-    ERROR_CAN_PACKET_NULL,          /**< Received a null CAN packet */
-    ERROR_CAN_DATA_PARSE_FAILED,    /**< Failed to parse CAN data */
-    ERROR_CAN_DEVICE_NOT_FOUND,     /**< No matching CAN device found */
-    ERROR_CAN_PID_NOT_FOUND,        /**< No matching PID found for CAN device */
-    ERROR_CAN_QUEUE_FULL,           /**< CAN message queue full */
-	ERROR_CAN_QUEUE_INIT_FAILED
+    ERROR_CATEGORY_GENERAL = 0,
+    ERROR_CATEGORY_CAN,
+    ERROR_CATEGORY_RTOS,
+    ERROR_CATEGORY_UI,
+    ERROR_CATEGORY_STORAGE,
+} ErrorCategory;
+
+/**
+ * @brief Enum for error severity levels.
+ */
+typedef enum {
+    ERROR_SEVERITY_INFO = 0,
+    ERROR_SEVERITY_WARNING,
+    ERROR_SEVERITY_CRITICAL,
+} ErrorSeverity;
+
+/**
+ * @brief Enum for error codes.
+ */
+typedef enum {
+    // General Errors (0-99)
+    ERROR_NO_ERROR = 0,
+    ERROR_INVALID_ARGUMENT,
+    ERROR_UNKNOWN, // Generic fallback error
+
+    // CAN-Related Errors (100-199)
+    ERROR_CAN_MODULE_NOT_FOUND = 100,
+    ERROR_MODULE_PID_NOT_FOUND,
+    ERROR_CAN_TRANSMIT_FAILED,
+    ERROR_CAN_INVALID_PAYLOAD,
+    ERROR_CAN_BUFFER_OVERFLOW,
+    ERROR_CAN_RETRIEVE_FAILED,
+    ERROR_CAN_QUEUE_FULL,
+    ERROR_CAN_PACKET_NULL,
+    ERROR_CAN_DATA_PARSE_FAILED, // Parsing failure
+    ERROR_CAN_DEVICE_NOT_FOUND,
+    ERROR_CAN_PID_NOT_FOUND,
+    ERROR_CAN_INIT_FAILED,         // New: CAN initialization failure
+    ERROR_CAN_NOTIFICATION_FAILED, // New: CAN notification activation failure
+	ERROR_CAN_FILTER_CONFIG_FAILED,
+	ERROR_CAN_INVALID_PACKET,
+	ERROR_CAN_PACKET_NOT_FOUND,
+
+    // RTOS-Related Errors (200-299)
+    ERROR_RTOS_QUEUE_INIT_FAILED = 200,
+    ERROR_RTOS_QUEUE_FULL,
+    ERROR_RTOS_MUTEX_TIMEOUT,
+    ERROR_RTOS_MUTEX_RELEASE_FAILED,
+
+    // UI-Related Errors (300-399)
+    ERROR_UI_RENDER_FAILED = 300,
+    ERROR_UI_LOGGING_FAILED,
+
+    // Storage-Related Errors (400-499)
+    ERROR_STORAGE_WRITE_FAILED = 400,
+    ERROR_STORAGE_READ_FAILED,
+
+    // New CAN Context Errors (500-599)
+    ERROR_CAN_QUEUE_UNAVAILABLE = 500,
+    ERROR_CAN_INVALID_CONTEXT
 } ErrorCodes;
 
+
+
+
+/**
+ * @brief Structure for defining error entries in the error table.
+ */
+typedef struct {
+    ErrorCodes code;                  /**< Error code. */
+    const char *message;             /**< Error message string. */
+    ErrorCategory category;          /**< Category of the error. */
+    ErrorSeverity severity;          /**< Severity of the error. */
+    uint32_t count;               /**< How many times has this happened? */
+} ErrorEntry;
 
 /* -----------------------------------------------------------------------------
    Function Declarations
    -------------------------------------------------------------------------- */
 
 /**
- * @brief Handle errors based on the provided error code.
- * @param error_code The error code indicating the type of error.
- * @param additional_info (Optional) Additional context or data about the error.
+ * @brief Handles an error, logs it, and optionally invokes the system error handler.
  */
-void user_error_handler(uint8_t error_code, const char *additional_info);
+void log_error_to_storage(ErrorCodes error_code, const char *context);
+void user_error_handler(ErrorCodes error_code, const char *format, ...);
 
 #ifdef __cplusplus
 }

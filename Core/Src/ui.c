@@ -5,6 +5,7 @@
  *      Author: Ryan
  */
 
+#include <can_core.h>
 #include <device_configs.h>  // Include the configurations for devices
 #include <string.h>          // For memset, strncpy
 #include <stdio.h>           // For snprintf
@@ -12,9 +13,9 @@
 
 #include "main.h"
 #include "ui.h"
+#include "can_common.h"
 #include "ssd1306_fonts.h"
 #include "utils.h"
-#include "can.h"
 
 
 /* ---| DISPLAY VARIABLES |-------------------------------------------------------------------- */
@@ -123,7 +124,7 @@ void display_messages() {
  * @param can_instance The CAN instance (e.g., CAN_TRUCK or CAN_AUX) to display data for.
  */
 void draw_screen_data_states(CANInstance can_instance) {
-	CANData *selected_can_data = &can_data[can_instance];
+	CAN_Bus_Data *selected_can_data = &can_data[can_instance];
 
     // Clear the state display area (top of the screen)
     ssd1306_FillRectangle(0, 0, SSD1306_WIDTH, STATE_LINES * SCREEN_FONT_HEIGHT, Black);
