@@ -59,6 +59,7 @@ ErrorEntry error_table[] = {
     {ERROR_RTOS_QUEUE_FULL,         "RTOS queue full",                     ERROR_CATEGORY_RTOS,    ERROR_SEVERITY_WARNING,    0},
     {ERROR_RTOS_MUTEX_TIMEOUT,      "RTOS mutex acquisition timed out",    ERROR_CATEGORY_RTOS,    ERROR_SEVERITY_CRITICAL,   0},
     {ERROR_RTOS_MUTEX_RELEASE_FAILED, "Failed to release packet pool mutex", ERROR_CATEGORY_RTOS,  ERROR_SEVERITY_WARNING,    0},
+	{ERROR_RTOS_MUTEX_INIT_FAILED,   "Failed to init pool mutex",          ERROR_CATEGORY_RTOS,    ERROR_SEVERITY_WARNING,    0},
 
     // UI-Related Errors (300-399)
     {ERROR_UI_RENDER_FAILED,        "UI rendering failed",                 ERROR_CATEGORY_UI,      ERROR_SEVERITY_WARNING,    0},

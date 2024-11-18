@@ -54,8 +54,9 @@ extern "C" {
 
 /* --- Initialization and Setup Functions --- */
 
+bool process_and_send_can_tx_packet(CAN_Packet *packet);
 
-void setup_can_tx_header(CAN_TxHeaderTypeDef *TxHeader, uint32_t std_id);
+void create_can_tx_header(CAN_TxHeaderTypeDef *tx_header, uint32_t std_id);
 
 /**
  * @brief Generate a CAN payload for the specified device and PID.
@@ -193,7 +194,7 @@ void log_valid_can_data(const Parsed_CAN_Data *parsed_data);
  */
 CANInstance get_can_instance_from_hcan(CAN_HandleTypeDef *hcan);
 
-void send_can_tx_request(CANInstance can_instance, CANDeviceConfig *device, CANDevicePID *pid);
+void send_can_request_to_tx_queue(CANInstance can_instance, CANDeviceConfig *device, CANDevicePID *pid);
 
 /**
  * @brief Determine if a CAN message should be ignored.

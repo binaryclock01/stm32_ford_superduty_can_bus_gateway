@@ -20,11 +20,19 @@
 
 #define RETRY_DELAY_MS 100   // Delay between retries in milliseconds
 
+typedef enum {
+	QUEUE_RX_CAN1,
+	QUEUE_RX_CAN2,
+	QUEUE_TX,
+	TOTAL_QUEUES
+} Circular_Queue_Types;
+
 typedef struct {
     CAN_Packet packets[CAN_BUFFER_SIZE]; /**< Circular buffer of TX packets. */
     uint8_t head;                          /**< Index of the next write position. */
     uint8_t tail;                          /**< Index of the next read position. */
-    uint8_t count;                         /**< Number of packets currently in the buffer. */
+    uint8_t count;                        /**< Number of packets currently in the buffer. */
+    osMutexId_t mutex_id;
 } CAN_Circular_Buffer;
 
 /**
@@ -46,6 +54,8 @@ extern osMessageQueueId_t CAN2_Rx_QueueHandle;
  * @brief Message queue handle for CAN transmission messages.
  */
 extern osMessageQueueId_t Tx_QueueHandle;
+
+extern CAN_Circular_Buffer can_circular_buffer[TOTAL_QUEUES];
 
 /**
  * @brief Processes a CAN Rx FIFO0 message callback.
@@ -77,16 +87,13 @@ void init_can_packet_pool(void);
 osMessageQueueId_t *get_queue_handle_from_hcan(CAN_HandleTypeDef *hcan);
 
 /**
- * @brief Enqueues a CAN packet into the buffer for the specified CAN instance.
+ * @brief Enqueue a CAN packet into the specified circular buffer with thread safety.
  *
- * Safely adds a CAN packet to the circular buffer associated with the given
- * CAN instance. Ensures no data is lost unless the buffer is full.
- *
- * @param can_instance The CAN instance (e.g., `CAN_TRUCK` or `CAN_AUX`).
+ * @param queue_id The queue ID (e.g., `QUEUE_RX_CAN1`, `QUEUE_RX_CAN2`)
  * @param packet Pointer to the `CAN_Packet` to enqueue.
- * @return true if the packet was successfully enqueued, false if the buffer is full.
+ * @return true if the packet was successfully enqueued, false if the buffer is full or a mutex error occurred.
  */
-bool _enqueue_can_packet(CANInstance can_instance, const CAN_Packet *packet);
+//bool _enqueue_can_rx_packet(int queue_id, const CAN_Packet *packet);
 
 /**
  * @brief Allocates a CAN packet from the circular buffer.
@@ -101,7 +108,7 @@ bool _enqueue_can_packet(CANInstance can_instance, const CAN_Packet *packet);
  *
  * @return CAN_Packet* Pointer to an allocated CAN packet, or NULL if the buffer is full.
  */
-CAN_Packet *_allocate_can_packet(void);
+CAN_Packet *_allocate_can_packet_on_circular_buffer(Circular_Queue_Types queue_type);
 
 /**
  * @brief Dequeues a CAN packet from the buffer for the specified CAN instance.
@@ -113,6 +120,6 @@ CAN_Packet *_allocate_can_packet(void);
  * @param packet Pointer to a `CAN_Packet` structure where the dequeued packet will be stored.
  * @return true if a packet was successfully dequeued, false if the buffer is empty.
  */
-bool _dequeue_can_packet(CAN_Packet *packet);
+bool _free_can_packet_from_circular_buffer(Circular_Queue_Types queue_type, CAN_Packet *packet);
 
 #endif // RTOS_H

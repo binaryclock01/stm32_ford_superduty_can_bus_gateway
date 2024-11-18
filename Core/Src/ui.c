@@ -124,7 +124,13 @@ void display_messages() {
  * @param can_instance The CAN instance (e.g., CAN_TRUCK or CAN_AUX) to display data for.
  */
 void draw_screen_data_states(CANInstance can_instance) {
-	CAN_Bus_Data *selected_can_data = &can_data[can_instance];
+	Circular_Queue_Types queue_type = QUEUE_RX_CAN1;
+
+	if (can_instance == CAN_AUX)
+		queue_type = QUEUE_RX_CAN2;
+
+	uint32_t rxcount = can_circular_buffer[queue_type].count;
+	uint32_t txcount = can_circular_buffer[QUEUE_TX].count;
 
     // Clear the state display area (top of the screen)
     ssd1306_FillRectangle(0, 0, SSD1306_WIDTH, STATE_LINES * SCREEN_FONT_HEIGHT, Black);
@@ -150,7 +156,7 @@ void draw_screen_data_states(CANInstance can_instance) {
 
     // Line 3: Transmission (Tx) and Reception (Rx) counts
     snprintf(screen_data_states[3], sizeof(screen_data_states[3]), "Tx:%lu Rx:%lu",
-             (unsigned long)selected_can_data->tx_count, (unsigned long)selected_can_data->rx_count);
+             (unsigned long)txcount, (unsigned long)rxcount);
 
     // Write each state line to the OLED display
     for (uint8_t i = 0; i < STATE_LINES; i++) {

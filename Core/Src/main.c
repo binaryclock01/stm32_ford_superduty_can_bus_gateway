@@ -32,6 +32,7 @@
 #include "ssd1306_fonts.h"
 #include "ui.h"
 #include "device_configs.h"
+#include "rtos.h"
 
 /* USER CODE END Includes */
 
@@ -92,10 +93,6 @@ const osThreadAttr_t CAN1_Send_Reque_attributes = {
   .priority = (osPriority_t) osPriorityAboveNormal,
 };
 /* USER CODE BEGIN PV */
-
-osMessageQueueId_t CAN1_Rx_QueueHandle;
-osMessageQueueId_t CAN2_Rx_QueueHandle;
-osMessageQueueId_t Tx_QueueHandle;
 
 const osMessageQueueAttr_t CAN1_Rx_Queue_attributes = {
   .name = "CAN1_Rx_Queue"
@@ -564,7 +561,7 @@ void StartCAN1_Rx_Task(void *argument)
 	  if (osMessageQueueGet(CAN1_Rx_QueueHandle, &packet, NULL, osWaitForever) == osOK) {
 		  if (packet != NULL) {
 			  process_can_rx_packet(packet); // Step 3: Process the received packet
-			  _dequeue_can_packet(packet);    // Step 4: Return the packet to the pool
+			  _free_can_packet_from_circular_buffer(QUEUE_RX_CAN1, packet);    // Step 4: Return the packet to the pool
 		  }
 	  }
   }
@@ -593,7 +590,7 @@ void StartCAN2_Rx_Task(void *argument)
       if (osMessageQueueGet(CAN2_Rx_QueueHandle, &packet, NULL, osWaitForever) == osOK) {
           if (packet != NULL) {
               process_can_rx_packet(packet); // Step 3: Process the received packet
-              _dequeue_can_packet(packet);    // Step 4: Return the packet to the pool
+              _free_can_packet_from_circular_buffer(QUEUE_RX_CAN2, packet);    // Step 4: Return the packet to the pool
           }
       }
   }
@@ -611,15 +608,15 @@ void StartCAN2_Rx_Task(void *argument)
 /* USER CODE END Header_Start_Tx_Task */
 void Start_Tx_Task(void *argument) {
     for (;;) {
-        CAN_Packet tx_packet;
+        CAN_Packet packet;
 
         // Step 1: Wait for a message in the Tx queue
-        if (osMessageQueueGet(Tx_QueueHandle, &tx_packet, NULL, osWaitForever) == osOK) {
+        if (osMessageQueueGet(Tx_QueueHandle, &packet, NULL, osWaitForever) == osOK) {
             bool sent = false;
 
             // Step 2: Retry logic for transmission
             for (int retry = 0; retry < MAX_RETRIES; retry++) {
-                if (process_and_send_can_tx_packet(&tx_packet)) {
+                if (process_and_send_can_tx_packet(&packet)) {
                     sent = true;
                     break; // Exit the retry loop on success
                 }
@@ -627,7 +624,7 @@ void Start_Tx_Task(void *argument) {
                 // Log retry attempt
                 char retry_msg[64];
                 snprintf(retry_msg, sizeof(retry_msg), "Retry %d for CAN Tx on instance %d",
-                         retry + 1, tx_packet.meta.can_instance);
+                         retry + 1, packet.meta.can_instance);
                 send_console_msg(retry_msg);
 
                 osDelay(RETRY_DELAY_MS); // Delay before retrying
