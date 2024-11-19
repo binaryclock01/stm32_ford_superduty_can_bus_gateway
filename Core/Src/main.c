@@ -17,7 +17,6 @@
   */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
-#include <can_core.h>
 #include "main.h"
 #include "cmsis_os.h"
 
@@ -33,6 +32,12 @@
 #include "ui.h"
 #include "device_configs.h"
 #include "rtos.h"
+
+int _write(int file, char *data, int len) {
+    // Use HAL_UART_Transmit to send data to UART2
+    HAL_UART_Transmit(&huart2, (uint8_t *)data, len, HAL_MAX_DELAY);
+    return len;
+}
 
 /* USER CODE END Includes */
 
@@ -56,6 +61,8 @@ CAN_HandleTypeDef hcan1;
 CAN_HandleTypeDef hcan2;
 
 I2C_HandleTypeDef hi2c1;
+
+UART_HandleTypeDef huart2;
 
 /* Definitions for CAN1_Rx_Task */
 osThreadId_t CAN1_Rx_TaskHandle;
@@ -114,6 +121,7 @@ static void MX_GPIO_Init(void);
 static void MX_CAN1_Init(void);
 static void MX_I2C1_Init(void);
 static void MX_CAN2_Init(void);
+static void MX_USART2_UART_Init(void);
 void StartCAN1_Rx_Task(void *argument);
 void StartCAN2_Rx_Task(void *argument);
 void Start_Tx_Task(void *argument);
@@ -165,7 +173,6 @@ bool configure_can_filter(CAN_HandleTypeDef *hcan, const CAN_FilterTypeDef *filt
 
 
 /* ---| TIME VARIABLES |-------------------------------------------------------------------- */
-uint32_t last_can_request_time = 0;  // Store the last time CAN requests were sent
 
 /*
  * FUNCTIONS
@@ -229,6 +236,7 @@ int main(void)
   MX_CAN1_Init();
   MX_I2C1_Init();
   MX_CAN2_Init();
+  MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
 
   ssd1306_Init(); // init OLED screen
@@ -260,6 +268,7 @@ int main(void)
 
   /* USER CODE BEGIN RTOS_MUTEX */
   /* add mutexes, ... */
+  init_circular_buffers();
   /* USER CODE END RTOS_MUTEX */
 
   /* USER CODE BEGIN RTOS_SEMAPHORES */
@@ -289,10 +298,10 @@ int main(void)
 
   /* Create the thread(s) */
   /* creation of CAN1_Rx_Task */
-//  CAN1_Rx_TaskHandle = osThreadNew(StartCAN1_Rx_Task, NULL, &CAN1_Rx_Task_attributes);
+  CAN1_Rx_TaskHandle = osThreadNew(StartCAN1_Rx_Task, NULL, &CAN1_Rx_Task_attributes);
 
   /* creation of CAN2_Rx_Task */
-//  CAN2_Rx_TaskHandle = osThreadNew(StartCAN2_Rx_Task, NULL, &CAN2_Rx_Task_attributes);
+  CAN2_Rx_TaskHandle = osThreadNew(StartCAN2_Rx_Task, NULL, &CAN2_Rx_Task_attributes);
 
   /* creation of Tx_Task */
   Tx_TaskHandle = osThreadNew(Start_Tx_Task, NULL, &Tx_Task_attributes);
@@ -505,6 +514,39 @@ static void MX_I2C1_Init(void)
 }
 
 /**
+  * @brief USART2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_USART2_UART_Init(void)
+{
+
+  /* USER CODE BEGIN USART2_Init 0 */
+
+  /* USER CODE END USART2_Init 0 */
+
+  /* USER CODE BEGIN USART2_Init 1 */
+
+  /* USER CODE END USART2_Init 1 */
+  huart2.Instance = USART2;
+  huart2.Init.BaudRate = 115200;
+  huart2.Init.WordLength = UART_WORDLENGTH_8B;
+  huart2.Init.StopBits = UART_STOPBITS_1;
+  huart2.Init.Parity = UART_PARITY_NONE;
+  huart2.Init.Mode = UART_MODE_TX_RX;
+  huart2.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart2.Init.OverSampling = UART_OVERSAMPLING_16;
+  if (HAL_UART_Init(&huart2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN USART2_Init 2 */
+
+  /* USER CODE END USART2_Init 2 */
+
+}
+
+/**
   * @brief GPIO Initialization Function
   * @param None
   * @retval None
@@ -564,6 +606,7 @@ void StartCAN1_Rx_Task(void *argument)
 			  _free_can_packet_from_circular_buffer(QUEUE_RX_CAN1, packet);    // Step 4: Return the packet to the pool
 		  }
 	  }
+	  osThreadYield();
   }
   /* USER CODE END 5 */
 }
@@ -593,48 +636,41 @@ void StartCAN2_Rx_Task(void *argument)
               _free_can_packet_from_circular_buffer(QUEUE_RX_CAN2, packet);    // Step 4: Return the packet to the pool
           }
       }
+      osThreadYield();
   }
   /* USER CODE END StartCAN2_Rx_Task */
 }
 
+/* USER CODE BEGIN Header_Start_Tx_Task */
 /**
- * @brief RTOS task to handle CAN packet transmission.
- *
- * This task retrieves packets from the Tx queue and sends them to the appropriate CAN bus.
- * It implements retry logic for failed transmissions and logs transmission failures.
- *
- * @param argument Unused argument for the task (for RTOS compatibility).
- */
+* @brief Function implementing the Tx_Task thread.
+*        This task retrieves messages from the Tx queue and sends them to the CAN bus.
+* @param argument: Not used
+* @retval None
+*/
 /* USER CODE END Header_Start_Tx_Task */
-void Start_Tx_Task(void *argument) {
+void Start_Tx_Task(void *argument)
+{
+    /* Infinite loop */
     for (;;) {
-        CAN_Packet packet;
+        CAN_Packet *packet = NULL; // Pointer to hold the dequeued CAN packet
 
-        // Step 1: Wait for a message in the Tx queue
+        // Wait for a CAN packet from the Tx queue
         if (osMessageQueueGet(Tx_QueueHandle, &packet, NULL, osWaitForever) == osOK) {
-            bool sent = false;
-
-            // Step 2: Retry logic for transmission
-            for (int retry = 0; retry < MAX_RETRIES; retry++) {
-                if (process_and_send_can_tx_packet(&packet)) {
-                    sent = true;
-                    break; // Exit the retry loop on success
+            if (packet != NULL) {
+                // Process and send the CAN packet
+                if (!__rtos__process_tx_queue_and_send_to_can1(packet)) {
+                    // Log or handle error if transmission fails
+                    send_console_msg("Failed to transmit CAN message.");
                 }
 
-                // Log retry attempt
-                char retry_msg[64];
-                snprintf(retry_msg, sizeof(retry_msg), "Retry %d for CAN Tx on instance %d",
-                         retry + 1, packet.meta.can_instance);
-                send_console_msg(retry_msg);
-
-                osDelay(RETRY_DELAY_MS); // Delay before retrying
-            }
-
-            // Step 3: Handle failure after retries
-            if (!sent) {
-                user_error_handler(ERROR_CAN_TRANSMIT_FAILED, "Max retries reached for CAN Tx");
+                // Optional: Free or reuse the packet
+                _free_can_packet_from_circular_buffer(QUEUE_TX, packet);
             }
         }
+
+        // Yield CPU time to other tasks
+        osThreadYield();
     }
   /* USER CODE END Start_Tx_Task */
 }
@@ -658,8 +694,8 @@ void StartHousekeeping_Task(void *argument)
 
       // Step 2: Perform system health checks
       // check_system_health(); // Uncomment if system health monitoring is implemented
-
-      osDelay(ONE_SECOND); // Delay task execution to run periodically (every 1000ms)
+      osThreadYield();
+//      osDelay(ONE_SECOND); // Delay task execution to run periodically (every 1000ms)
   }
   /* USER CODE END StartHousekeeping_Task */
 }
@@ -671,18 +707,31 @@ void StartHousekeeping_Task(void *argument)
 * @retval None
 */
 /* USER CODE END Header_StartCAN_Tx_Send_Requests */
+
+/* USER CODE BEGIN StartCAN_Tx_Send_Requests */
+
 void StartCAN_Tx_Send_Requests(void *argument)
 {
-  /* USER CODE BEGIN StartCAN_Tx_Send_Requests */
   /* Infinite loop */
-  for (;;) {
-	  // Step 1: Update OLED display for the specified CAN instance
-	  send_all_requests();
+  for (;;)
+  {
+	  uint32_t queue_length = osMessageQueueGetCount(Tx_QueueHandle);
+	  char msg[100];
+	  if (queue_length > 7)
+		  sprintf(msg, "Cannot send Tx requests - Tx_QueueHandle has %lu elements and it would overflow the buffer.", queue_length);
+	  else
+	  {
+		  // Step 1: Update OLED display for the specified CAN instance
+		  sprintf(msg, "%s", "Sending requests...");
+		  send_all_requests();
+	  }
 
-	  // Step 2: Perform system health checks
-	  // check_system_health(); // Uncomment if system health monitoring is implemented
+      send_console_msg(msg);
 
-	  osDelay(ONE_SECOND); // Delay task execution to run periodically (every 1000ms)
+      osThreadYield();
+
+      osDelay(ONE_SECOND);
+
   }
   /* USER CODE END StartCAN_Tx_Send_Requests */
 }

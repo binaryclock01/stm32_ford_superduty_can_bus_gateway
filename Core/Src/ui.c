@@ -61,6 +61,10 @@ void scroll_messages() {
  * @param msg Pointer to the null-terminated message string to be displayed.
  */
 void send_console_msg(const char *msg) {
+	char uart_msg[255];
+
+	sprintf(uart_msg, "%s\r\n", msg);
+	HAL_UART_Transmit(&huart2, (uint8_t*)uart_msg, strlen(uart_msg), HAL_MAX_DELAY);
     // Check if the message buffer is full and scroll if necessary
     if (screen_line >= MESSAGE_LINES) {
         scroll_messages();

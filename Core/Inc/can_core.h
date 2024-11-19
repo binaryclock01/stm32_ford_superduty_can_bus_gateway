@@ -54,7 +54,7 @@ extern "C" {
 
 /* --- Initialization and Setup Functions --- */
 
-bool process_and_send_can_tx_packet(CAN_Packet *packet);
+bool __rtos__process_tx_queue_and_send_to_can1(CAN_Packet *packet);
 
 void create_can_tx_header(CAN_TxHeaderTypeDef *tx_header, uint32_t std_id);
 

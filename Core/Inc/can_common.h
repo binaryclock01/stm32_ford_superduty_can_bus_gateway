@@ -92,7 +92,12 @@ typedef struct {
     CAN_Payload_Array payload; /**< CAN message payload. */
 } CAN_Packet;
 
-
+typedef struct {
+    CAN_Packet_Flow flow;      /**< Direction of the packet (Rx or Tx). */
+    CAN_Metadata meta;         /**< Metadata (CAN instance, timestamp). */
+    CAN_TxHeaderTypeDef header;  // Transmission header
+    CAN_Payload_Array payload;          // Pointer to the CAN packet
+} CAN_Tx_Packet;
 
 /**
  * @brief Structure to hold parsed CAN data.

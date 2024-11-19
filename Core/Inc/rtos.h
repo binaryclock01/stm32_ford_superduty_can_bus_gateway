@@ -35,10 +35,6 @@ typedef struct {
     osMutexId_t mutex_id;
 } CAN_Circular_Buffer;
 
-/**
- * @brief Mutex for protecting shared resources in the CAN packet pool.
- */
-extern osMutexId_t packet_pool_mutex;
 
 /**
  * @brief Message queue handle for CAN1 receive messages.
@@ -73,7 +69,7 @@ void process_can_rx_fifo_callback(CAN_HandleTypeDef *hcan);
  * This function must be called during system initialization to ensure
  * that the packet pool is ready for use.
  */
-void init_can_packet_pool(void);
+void init_circular_buffers(void);
 
 /**
  * @brief Retrieves the message queue handle for a given CAN hardware instance.

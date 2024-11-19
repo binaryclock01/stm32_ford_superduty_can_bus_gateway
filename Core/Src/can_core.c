@@ -213,14 +213,18 @@ void send_can_request_to_tx_queue(CANInstance can_instance, CANDeviceConfig *dev
     // Step 4: Allocate and prepare the CAN packet
     CAN_Packet *packet = &tx_buffer->packets[tx_buffer->head]; // Get the next write position
     uint32_t request_id = get_request_id(device->can_id);       // Get the unique request ID
-    CAN_TxHeaderTypeDef tx_header;
-    create_can_tx_header(&tx_header, request_id);          // Configure the header
-    packet->meta.can_instance = can_instance;                 // Set CAN instance
-    packet->meta.timestamp = HAL_GetTick();                   // Capture the timestamp
-    generate_can_tx_read_data_payload(device, pid, packet->payload); // Generate the payload
-    packet->flow = PACKET_TX;                                 // Mark as Tx packet
 
-    // Step 5: Update the circular buffer
+    // Create and configure the tx_header
+    CAN_TxHeaderTypeDef tx_header;
+    //create_can_tx_header(&tx_header, request_id);               // Configure the header
+
+    // Generate payload and set metadata
+    generate_can_tx_read_data_payload(device, pid, packet->payload); // Generate the payload
+    packet->meta.can_instance = can_instance;                  // Set CAN instance
+    packet->meta.timestamp = HAL_GetTick();                    // Capture the timestamp
+    packet->flow = PACKET_TX;                                  // Mark as Tx packet
+
+    // Step 5: Store the packet in the circular buffer
     tx_buffer->head = (tx_buffer->head + 1) % CAN_BUFFER_SIZE; // Increment the head index
     tx_buffer->count++;                                       // Increment the count
 
@@ -229,8 +233,18 @@ void send_can_request_to_tx_queue(CANInstance can_instance, CANDeviceConfig *dev
         user_error_handler(ERROR_RTOS_MUTEX_RELEASE_FAILED, "Failed to release mutex for TX circular buffer");
         return;
     }
+    packet->header.dlc = 8;
+    packet->header.id = request_id;
 
-    // Step 6: Enqueue the packet reference into the Tx queue
+    /*
+    // Step 6: Enqueue the packet and tx_header reference into the Tx queue
+    CAN_Tx_Packet tx_packet = {
+        .header = tx_header,  // Pass the tx_header
+        .meta = packet->meta,
+    };
+
+    memcpy(tx_packet.payload, packet->payload, sizeof(tx_packet.payload));
+*/
     if (osMessageQueuePut(Tx_QueueHandle, &packet, 0, 0) != osOK) {
         user_error_handler(ERROR_CAN_TRANSMIT_FAILED, "Failed to enqueue CAN packet into Tx queue");
 
@@ -247,6 +261,50 @@ void send_can_request_to_tx_queue(CANInstance can_instance, CANDeviceConfig *dev
     log_can_message(request_id, packet->payload, packet->header.dlc);
 }
 
+/**
+ * @brief Processes a message from the TX queue and sends it to the TRUCK_CAN (hcan1).
+ *
+ * @return bool Returns true if the message was sent successfully, false otherwise.
+ */
+bool __rtos__process_tx_queue_and_send_to_can1(CAN_Packet *packet) {
+    // Step 1: Validate the packet
+    if (packet == NULL) {
+        send_console_msg("Invalid CAN packet in TX queue.");
+        return false;
+    }
+
+    // Step 2: Prepare the HAL CAN Tx header
+    CAN_TxHeaderTypeDef hal_tx_header = {
+        .StdId = packet->header.id,
+        .ExtId = packet->header.id,
+        .IDE = packet->header.is_extended_id ? CAN_ID_EXT : CAN_ID_STD,
+        .RTR = packet->header.is_remote_frame ? CAN_RTR_REMOTE : CAN_RTR_DATA,
+        .DLC = packet->header.dlc,
+        .TransmitGlobalTime = DISABLE
+    };
+
+    // Step 3: Send the message via HAL CAN API
+    uint32_t mailbox;
+    if (HAL_CAN_AddTxMessage(&hcan1, &hal_tx_header, packet->payload, &mailbox) != HAL_OK) {
+        // Transmission failed, log the error
+        char error_msg[64];
+        snprintf(error_msg, sizeof(error_msg), "CAN TX failed: ID=0x%lX", packet->header.id);
+        send_console_msg(error_msg);
+
+        // Optionally re-enqueue the message or handle failure
+        return false;
+    }
+
+    // Step 5: Log successful transmission
+    char success_msg[64];
+    snprintf(success_msg, sizeof(success_msg), "CAN TX success: ID=0x%lX", packet->header.id);
+    send_console_msg(success_msg);
+
+    // Step 6: Free the packet after successful transmission
+    _free_can_packet_from_circular_buffer(QUEUE_TX, packet);
+
+    return true;
+}
 
 /**
  * @brief Send CAN requests for all devices and their PIDs.

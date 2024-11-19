@@ -64,6 +64,7 @@ extern I2C_HandleTypeDef hi2c1;
 extern osMessageQueueId_t CAN1_Rx_QueueHandle;
 extern osMessageQueueId_t CAN2_Rx_QueueHandle;
 extern osMessageQueueId_t Tx_QueueHandle;
+extern UART_HandleTypeDef huart2;
 
 /**
  * @brief Display-related variables.

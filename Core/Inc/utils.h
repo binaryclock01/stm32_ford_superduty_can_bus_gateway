@@ -21,6 +21,15 @@ extern "C" {
 /* -----------------------------------------------------------------------------
    Function Declarations
    -------------------------------------------------------------------------- */
+
+/**
+ * @brief Simulates an osDelayUntil functionality for CMSIS-RTOS v2.
+ * @param lastWakeTime Pointer to the last wake time reference (in ticks).
+ * @param period Period in ticks to delay until.
+ */
+void osDelayUntilCMSIS(uint32_t *lastWakeTime, uint32_t period);
+
+
 void bytes_to_big_endian(void *dest, const uint8_t *src, size_t size);
 /**
  * @brief Convert a 4-byte array into a 32-bit unsigned integer (big-endian).
