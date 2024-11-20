@@ -2,6 +2,7 @@
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>  // For memcpy
+#include "main.h"
 
 #if defined(SSD1306_USE_I2C)
 
@@ -27,9 +28,9 @@ void ssd1306_Reset(void) {
 
     // Reset the OLED
     HAL_GPIO_WritePin(SSD1306_Reset_Port, SSD1306_Reset_Pin, GPIO_PIN_RESET);
-    HAL_Delay(10);
+    Delay(10);
     HAL_GPIO_WritePin(SSD1306_Reset_Port, SSD1306_Reset_Pin, GPIO_PIN_SET);
-    HAL_Delay(10);
+    Delay(10);
 }
 
 // Send a byte to the command register
@@ -75,7 +76,7 @@ void ssd1306_Init(void) {
     ssd1306_Reset();
 
     // Wait for the screen to boot
-    HAL_Delay(100);
+    Delay(100);
 
     // Init OLED
     ssd1306_SetDisplayOn(0); //display off
