@@ -11,8 +11,9 @@
 #ifndef RTOS_H
 #define RTOS_H
 
-#include <can_core.h>      // For CAN-related structures
+//#include <can_core.h>      // For CAN-related structures
 #include "cmsis_os.h" // RTOS CMSIS types and functions
+#include "can_common.h"
 
 
 #define CAN_PACKET_POOL_SIZE 10 ///< Unified size for CAN packet pool and circular buffers
@@ -23,9 +24,21 @@
 typedef enum {
 	QUEUE_RX_CAN1,
 	QUEUE_RX_CAN2,
-	QUEUE_TX,
-	TOTAL_QUEUES
+	QUEUE_TX_CAN1,
+	QUEUE_TX_CAN2,
+	TOTAL_QUEUES,
+	QUEUE_TYPE_UNKNOWN
 } Circular_Queue_Types;
+
+typedef enum {
+	QUEUE_TYPE_FLOW_UNKNOWN,
+	QUEUE_TYPE_FLOW_TX,
+	QUEUE_TYPE_FLOW_RX,
+} Queue_Type_Flow;
+
+typedef struct {
+	uint32_t total_packets;
+} CAN_Circular_Buffer_Meta;
 
 typedef struct {
     CAN_Packet packets[CAN_BUFFER_SIZE]; /**< Circular buffer of TX packets. */
@@ -33,25 +46,38 @@ typedef struct {
     uint8_t tail;                          /**< Index of the next read position. */
     uint8_t count;                        /**< Number of packets currently in the buffer. */
     osMutexId_t mutex_id;
+    osMessageQueueId_t queue_handle;
+    CAN_Circular_Buffer_Meta meta;
 } CAN_Circular_Buffer;
 
 
-/**
- * @brief Message queue handle for CAN1 receive messages.
- */
+/*
 extern osMessageQueueId_t CAN1_Rx_QueueHandle;
-
-/**
- * @brief Message queue handle for CAN2 receive messages.
- */
 extern osMessageQueueId_t CAN2_Rx_QueueHandle;
-
-/**
- * @brief Message queue handle for CAN transmission messages.
- */
-extern osMessageQueueId_t Tx_QueueHandle;
+extern osMessageQueueId_t CAN1_Tx_QueueHandle;
+extern osMessageQueueId_t CAN2_Tx_QueueHandle;
+*/
 
 extern CAN_Circular_Buffer can_circular_buffer[TOTAL_QUEUES];
+
+
+
+
+/**
+ * @brief Main StartCAN_Rx_Task that will call __rtos_StartCAN_Rx#_Task() depending on the can instance
+ */
+void __rtos__StartCAN_Rx_Task(CANInstance enum_can_instance);
+void __rtos_StartCAN1_Rx_Task();
+void __rtos_StartCAN2_Rx_Task();
+
+/**
+ * @brief Main StartCAN_Rx_Task that will call __rtos_StartCAN_Tx#_Task() depending on the can instance
+ */
+void __rtos__StartCAN_Tx_Task(CANInstance enum_can_instance);
+void __rtos_StartCAN1_Tx_Task();
+void __rtos_StartCAN2_Tx_Task();
+
+bool __rtos_process_tx_queue_and_send_to_can(CANInstance enum_can_instance, CAN_Packet *packet);
 
 /**
  * @brief Processes a CAN Rx FIFO0 message callback.
@@ -80,7 +106,7 @@ void init_circular_buffers(void);
  * @param hcan Pointer to the CAN hardware handle (e.g., `hcan1` or `hcan2`).
  * @return osMessageQueueId_t* Pointer to the corresponding message queue handle, or NULL if not found.
  */
-osMessageQueueId_t *get_queue_handle_from_hcan(CAN_HandleTypeDef *hcan);
+osMessageQueueId_t *get_rx_queue_handle_from_hcan(CAN_HandleTypeDef *hcan);
 
 /**
  * @brief Enqueue a CAN packet into the specified circular buffer with thread safety.
@@ -116,6 +142,7 @@ CAN_Packet *_allocate_can_packet_on_circular_buffer(Circular_Queue_Types queue_t
  * @param packet Pointer to a `CAN_Packet` structure where the dequeued packet will be stored.
  * @return true if a packet was successfully dequeued, false if the buffer is empty.
  */
-bool _free_can_packet_from_circular_buffer(Circular_Queue_Types queue_type, CAN_Packet *packet);
+bool _free_can_packet_using_queue_buffer_from_circular_buffer(CAN_Circular_Buffer *queue_buffer);
+bool _free_can_packet_using_queue_type_from_circular_buffer(Circular_Queue_Types queue_type);
 
 #endif // RTOS_H

@@ -20,11 +20,12 @@
 
 #include "main.h"            // For HAL_CAN and other core includes
 #include "ssd1306.h"         // For OLED display functions
-//#include "ui.h"              // For console message utilities
+#include "ui.h"              // For console message utilities
 #include "utils.h"           // For helper functions like bytes_to_uint32
 #include "error.h"           // For error handling utilities
 #include <cmsis_os.h>        // RTOS CMSIS types, such as osMutedId_t
 #include "rtos.h"
+#include "can_core.h"
 
 /* -----------------------------------------------------------------------------
    Function Definitions
@@ -39,6 +40,83 @@ CAN_HandleTypeDef *can_handles[] = {
 };
 
 /**
+ * @brief Simulates CAN2 responding to a request from CAN1.
+ *
+ * This function dequeues a packet from CAN1's Rx circular buffer, checks for a matching
+ * request (e.g., PID `0x71 0x50`), and generates a simulated response that is enqueued
+ * into CAN2's Tx queue.
+ *
+ * @param bcm_id Base BCM ID for response generation.
+ */
+/*
+void simulate_can_response(uint32_t bcm_id) {
+    CAN_Packet request_packet;
+    CAN_Packet *response_packet;
+
+    Circular_Queue_Types queue_enum = QUEUE_TX_CAN2;
+    osMessageQueueId_t queue_handle = get_queue_handle_by_queue_num(queue_enum);
+
+	// Wait for a CAN packet from the Tx queue
+	if (osMessageQueueGet(queue_handle, &packet, NULL, osWaitForever) == osOK) {
+		if (packet == NULL)
+		{
+			_free_can_packet_using_queue_type_from_circular_buffer(packet, queue_enum);
+	    	char error_msg[255];
+	    	snprintf(error_msg, sizeof(error_msg), "%s: NULL packet, TX queue enum: %du, **freed packet**", __func__, enum_can_instance);
+	    	user_error_handler(ERROR_RTOS_QUEUE_NULL_PACKET, error_msg);
+			return;
+		}
+	}
+
+    // Step 2: Check if the packet matches the expected request PID
+    if (request_packet.header.id != bcm_id ||
+        request_packet.payload[0] != 0x71 ||
+        request_packet.payload[1] != 0x50) {
+        // Packet does not match the expected PID; ignore
+        return;
+    }
+
+    // Step 3: Allocate a response packet in CAN2's Tx circular buffer
+    response_packet = _allocate_can_packet_on_circular_buffer(tx_queue_enum);
+    if (response_packet == NULL) {
+        user_error_handler(ERROR_CAN_BUFFER_OVERFLOW, "Failed to allocate response packet for CAN2");
+        return;
+    }
+
+    // Step 4: Populate the response packet
+    memset(response_packet, 0, sizeof(CAN_Packet)); // Clear the packet
+    response_packet->header.id = bcm_id + 0x08;    // Response ID
+    response_packet->header.dlc = 8;               // Response DLC
+    response_packet->meta.can_instance = CAN_AUX; // Respond on CAN2
+    response_packet->meta.timestamp = HAL_GetTick(); // Current timestamp
+    response_packet->flow = PACKET_TX;
+
+    // first two bytes are bytes to follow and command
+    response_packet->payload[0] = 0x07; // 7 bytes to follow
+    response_packet->payload[1] = can_reply_commands[RESP_READ].byte; // 0x62 for respond to read request
+
+    // Populate response payload (example data)
+    response_packet->payload[2] = 0x71; // Echo the PID
+    response_packet->payload[3] = 0x50; // Echo the PID
+    response_packet->payload[4] = 0x00; // will be x04 for on, 0x00 off
+    response_packet->payload[5] = 0x00; // Example response data
+    response_packet->payload[6] = 0x00; // Example response data
+    response_packet->payload[7] = 0x00; // Example response data
+
+    // Step 5: Enqueue the response packet into CAN2's Tx queue
+    if (osMessageQueuePut(tx_queue_handle, &response_packet, 0, 0) != osOK) {
+        user_error_handler(ERROR_CAN_QUEUE_FULL, "Failed to enqueue response packet into CAN2 Tx queue");
+        _free_can_packet_from_circular_buffer(tx_queue_enum, response_packet); // Free the packet on failure
+        return;
+    }
+
+    // Optional: Log the response for debugging
+
+    log_can_message(response_packet->header.id, response_packet->payload, response_packet->header.dlc);
+}
+*/
+
+/**
  * @brief Retrieve the CAN handle for the given CAN instance.
  *
  * This function maps a `CANInstance` enumeration value to its corresponding
@@ -49,7 +127,7 @@ CAN_HandleTypeDef *can_handles[] = {
  * @return CAN_HandleTypeDef* Pointer to the corresponding CAN hardware handle,
  *         or NULL if the instance is invalid.
  */
-CAN_HandleTypeDef *get_can_handle_from_instance(CANInstance instance) {
+CAN_HandleTypeDef *get_hcan_from_instance(CANInstance instance) {
     switch (instance) {
         case CAN_TRUCK:
             return &hcan1; // Replace with actual CAN handle for CAN_TRUCK
@@ -57,8 +135,8 @@ CAN_HandleTypeDef *get_can_handle_from_instance(CANInstance instance) {
             return &hcan2; // Replace with actual CAN handle for CAN_AUX
         default:
             // Log an error for an invalid instance
-            char error_msg[64];
-            snprintf(error_msg, sizeof(error_msg), "Invalid CAN instance: %d", instance);
+            char error_msg[255];
+            snprintf(error_msg, sizeof(error_msg), "%s: Invalid CAN instance: %d", __func__, instance);
             user_error_handler(ERROR_CAN_INVALID_CONTEXT, error_msg);
             return NULL;
     }
@@ -157,6 +235,15 @@ void generate_can_tx_read_data_payload(CANDeviceConfig *device, CANDevicePID *pi
     memcpy(TxData, &request_payload, MAX_DLC_BYTE_LENGTH);     // Copy payload into TxData buffer
 }
 
+uint32_t get_can_device_stdid(CANDeviceConfig *device, CAN_Verb_Type verb)
+{
+	if (verb == CAN_VERB_REPLY)
+		return device->id.reply;
+	else if (verb == CAN_VERB_REQUEST)
+		return device->id.request;
+	return 0;
+}
+
 /**
  * @brief Debug and log the transmitted CAN message.
  *
@@ -179,6 +266,58 @@ void log_can_message(uint64_t request_id, uint8_t *TxData, uint8_t dlc) {
 }
 
 
+Circular_Queue_Types get_queue_num_by_can_instance(CANInstance can_instance, Queue_Type_Flow queue_type)
+{
+	if (can_instance >= CAN_TOTAL)
+		return QUEUE_TYPE_FLOW_UNKNOWN;
+
+	switch (queue_type)
+	{
+		case QUEUE_TYPE_FLOW_TX:
+			if (can_instance == CAN_TRUCK)
+				return QUEUE_TX_CAN1;
+			else
+				return QUEUE_TX_CAN2;
+			break;
+		case QUEUE_TYPE_FLOW_RX:
+			if (can_instance == CAN_TRUCK)
+				return QUEUE_RX_CAN1;
+			else
+				return QUEUE_RX_CAN2;
+			break;
+			break;
+		default:
+			return QUEUE_TYPE_FLOW_UNKNOWN;
+	}
+}
+
+
+osMessageQueueId_t get_queue_handle_by_can_instance(CANInstance can_instance, Queue_Type_Flow flow_dir)
+{
+	if (can_instance == CAN_TRUCK)
+	{
+		if (flow_dir == QUEUE_TYPE_FLOW_RX)
+			return can_circular_buffer[QUEUE_RX_CAN1].queue_handle;
+		else if (flow_dir == QUEUE_TYPE_FLOW_TX)
+			return can_circular_buffer[QUEUE_TX_CAN1].queue_handle;
+	}
+	else if (can_instance == CAN_AUX)
+	{
+		if (flow_dir == QUEUE_TYPE_FLOW_RX)
+			return can_circular_buffer[QUEUE_RX_CAN2].queue_handle;
+		else if (flow_dir == QUEUE_TYPE_FLOW_TX)
+			return can_circular_buffer[QUEUE_TX_CAN2].queue_handle;
+	}
+
+	// if none matched, return NULL pointer
+	return NULL;
+}
+
+osMessageQueueId_t *get_queue_handle_by_queue_num(Circular_Queue_Types queue_num)
+{
+	return &can_circular_buffer[queue_num].queue_handle;
+}
+
 /**
  * @brief Prepare and enqueue a CAN request for a specific device and PID.
  *
@@ -189,122 +328,57 @@ void log_can_message(uint64_t request_id, uint8_t *TxData, uint8_t dlc) {
  * @param device Pointer to the CANDeviceConfig representing the target device.
  * @param pid Pointer to the CANDevicePID specifying the requested PID.
  */
-void send_can_request_to_tx_queue(CANInstance can_instance, CANDeviceConfig *device, CANDevicePID *pid) {
+void send_can_packet_to_tx_queue(CANInstance can_instance, CANDeviceConfig *device, CANDevicePID *pid, CAN_Verb_Type verb) {
     // Step 1: Validate inputs
-    if (device == NULL || pid == NULL) {
-        user_error_handler(ERROR_INVALID_ARGUMENT, "Device or PID is NULL in send_can_request_to_tx_queue");
+    if (device == NULL || pid == NULL || can_instance >= CAN_TOTAL) {
+        user_error_handler(ERROR_INVALID_ARGUMENT, "Device or PID is NULL or invalid CAN instance in send_can_request_to_tx_queue");
         return;
     }
 
-    // Step 2: Acquire mutex for thread-safe access to the circular buffer
-    if (osMutexAcquire(can_circular_buffer[QUEUE_TX].mutex_id, osWaitForever) != osOK) {
-        user_error_handler(ERROR_RTOS_MUTEX_TIMEOUT, "Failed to acquire mutex for TX circular buffer");
+    // Step 2: Get queue information
+    Circular_Queue_Types queue_num = get_queue_num_by_can_instance(can_instance, QUEUE_TYPE_FLOW_TX);
+    osMessageQueueId_t queue_handle = get_queue_handle_by_queue_num(queue_num);
+
+    // Step 3: Allocate a CAN packet from the circular buffer
+    CAN_Packet *packet = _allocate_can_packet_on_circular_buffer(queue_num);
+    if (!packet) {
+        user_error_handler(ERROR_RTOS_QUEUE_ALLOCATION_FAILED, "Failed to allocate CAN packet in send_can_request_to_tx_queue");
         return;
     }
 
-    // Step 3: Check if the buffer is full
-    CAN_Circular_Buffer *tx_buffer = &can_circular_buffer[QUEUE_TX];
-    if (tx_buffer->count >= CAN_BUFFER_SIZE) {
-        osMutexRelease(tx_buffer->mutex_id); // Ensure mutex is released before returning
-        user_error_handler(ERROR_CAN_BUFFER_OVERFLOW, "Circular buffer is full, cannot enqueue CAN packet");
-        return;
-    }
+    // get request id if verb is CAN_VERB_REQUEST, and reply id if verb is CAN_VERB_REPLY
+    uint32_t verb_stdid = get_can_device_stdid(device, verb);
 
-    // Step 4: Allocate and prepare the CAN packet
-    CAN_Packet *packet = &tx_buffer->packets[tx_buffer->head]; // Get the next write position
-    uint32_t request_id = get_request_id(device->can_id);       // Get the unique request ID
-
-    // Create and configure the tx_header
-    CAN_TxHeaderTypeDef tx_header;
-    //create_can_tx_header(&tx_header, request_id);               // Configure the header
-
-    // Generate payload and set metadata
+    // Step 5: Populate the CAN packet
     generate_can_tx_read_data_payload(device, pid, packet->payload); // Generate the payload
     packet->meta.can_instance = can_instance;                  // Set CAN instance
     packet->meta.timestamp = HAL_GetTick();                    // Capture the timestamp
     packet->flow = PACKET_TX;                                  // Mark as Tx packet
+    packet->header.dlc = 8;                                    // Data length code
+    packet->header.id = verb_stdid;                            // Unique request ID
 
-    // Step 5: Store the packet in the circular buffer
-    tx_buffer->head = (tx_buffer->head + 1) % CAN_BUFFER_SIZE; // Increment the head index
-    tx_buffer->count++;                                       // Increment the count
-
-    // Release the mutex after updating the buffer
-    if (osMutexRelease(tx_buffer->mutex_id) != osOK) {
-        user_error_handler(ERROR_RTOS_MUTEX_RELEASE_FAILED, "Failed to release mutex for TX circular buffer");
-        return;
-    }
-    packet->header.dlc = 8;
-    packet->header.id = request_id;
-
-    /*
-    // Step 6: Enqueue the packet and tx_header reference into the Tx queue
-    CAN_Tx_Packet tx_packet = {
-        .header = tx_header,  // Pass the tx_header
-        .meta = packet->meta,
-    };
-
-    memcpy(tx_packet.payload, packet->payload, sizeof(tx_packet.payload));
-*/
-    if (osMessageQueuePut(Tx_QueueHandle, &packet, 0, 0) != osOK) {
+    // Step 6: Attempt to enqueue the packet
+    if (osMessageQueuePut(queue_handle, &packet, 0, 0) != osOK) {
+        // Log failure to enqueue
         user_error_handler(ERROR_CAN_TRANSMIT_FAILED, "Failed to enqueue CAN packet into Tx queue");
 
-        // Rollback the buffer changes
+        // Rollback circular buffer changes
+        CAN_Circular_Buffer *tx_buffer = &can_circular_buffer[queue_num];
         if (osMutexAcquire(tx_buffer->mutex_id, osWaitForever) == osOK) {
             tx_buffer->head = (tx_buffer->head == 0) ? (CAN_BUFFER_SIZE - 1) : (tx_buffer->head - 1);
             tx_buffer->count--;
             osMutexRelease(tx_buffer->mutex_id);
+        } else {
+            user_error_handler(ERROR_RTOS_MUTEX_INIT_FAILED, "Failed to acquire mutex for rollback in send_can_request_to_tx_queue");
         }
         return;
     }
 
     // Step 7: Log the message for debugging
-    log_can_message(request_id, packet->payload, packet->header.dlc);
+    log_can_message(verb_stdid, packet->payload, packet->header.dlc);
 }
 
-/**
- * @brief Processes a message from the TX queue and sends it to the TRUCK_CAN (hcan1).
- *
- * @return bool Returns true if the message was sent successfully, false otherwise.
- */
-bool __rtos__process_tx_queue_and_send_to_can1(CAN_Packet *packet) {
-    // Step 1: Validate the packet
-    if (packet == NULL) {
-        send_console_msg("Invalid CAN packet in TX queue.");
-        return false;
-    }
 
-    // Step 2: Prepare the HAL CAN Tx header
-    CAN_TxHeaderTypeDef hal_tx_header = {
-        .StdId = packet->header.id,
-        .ExtId = packet->header.id,
-        .IDE = packet->header.is_extended_id ? CAN_ID_EXT : CAN_ID_STD,
-        .RTR = packet->header.is_remote_frame ? CAN_RTR_REMOTE : CAN_RTR_DATA,
-        .DLC = packet->header.dlc,
-        .TransmitGlobalTime = DISABLE
-    };
-
-    // Step 3: Send the message via HAL CAN API
-    uint32_t mailbox;
-    if (HAL_CAN_AddTxMessage(&hcan1, &hal_tx_header, packet->payload, &mailbox) != HAL_OK) {
-        // Transmission failed, log the error
-        char error_msg[64];
-        snprintf(error_msg, sizeof(error_msg), "CAN TX failed: ID=0x%lX", packet->header.id);
-        send_console_msg(error_msg);
-
-        // Optionally re-enqueue the message or handle failure
-        return false;
-    }
-
-    // Step 5: Log successful transmission
-    char success_msg[64];
-    snprintf(success_msg, sizeof(success_msg), "CAN TX success: ID=0x%lX", packet->header.id);
-    send_console_msg(success_msg);
-
-    // Step 6: Free the packet after successful transmission
-    _free_can_packet_from_circular_buffer(QUEUE_TX, packet);
-
-    return true;
-}
 
 /**
  * @brief Send CAN requests for all devices and their PIDs.
@@ -319,7 +393,7 @@ void send_all_requests(void) {
 
         for (size_t pid_index = 0; pid_index < device->pid_count; pid_index++) {
             CANDevicePID *pid = &device->pids[pid_index];
-            send_can_request_to_tx_queue(CAN_TRUCK, device, pid);
+            send_can_packet_to_tx_queue(CAN_TRUCK, device, pid, CAN_VERB_REQUEST);
         }
     }
 }
@@ -333,12 +407,12 @@ void send_all_requests(void) {
  * @param rx_id The CAN ID to search for.
  * @return CANDeviceConfig* Pointer to the matching device configuration, or NULL if not found.
  */
-CANDeviceConfig *get_device_config_by_id(uint32_t rx_id) {
+CANDeviceConfig *get_device_config_by_id(uint32_t stdid, CAN_Packet_Flow flow) {
     for (uint8_t module_idx = 0; module_idx < CAN_DEVICE_COUNT; module_idx++) {
         CANDeviceConfig *module_config = &can_devices[module_idx];
-        if (module_config->can_id == rx_id) {
+        if ( ( (flow == PACKET_RX) && module_config->id.reply ) ||
+        	 ( (flow == PACKET_TX) && module_config->id.request ) )
             return module_config;
-        }
     }
     return NULL;
 }
@@ -655,15 +729,16 @@ void log_valid_can_data(const Parsed_CAN_Data *parsed_data) {
  *
  * @param packet Pointer to the `CAN_Packet` containing the metadata, unified header, and payload.
  * @return true if the packet was successfully transmitted, false otherwise.
+
  */
-bool process_and_send_can_tx_packet(CAN_Packet *packet) {
+bool __rtos_send_tx_packet_to_can_interface(CAN_Packet *packet) {
     if (packet == NULL) {
         user_error_handler(ERROR_INVALID_ARGUMENT, "Tx packet pointer is NULL");
         return false;
     }
 
     // Step 1: Validate the CAN instance
-    CAN_HandleTypeDef *target_can = get_can_handle_from_instance(packet->meta.can_instance);
+    CAN_HandleTypeDef *target_can = get_hcan_from_instance(packet->meta.can_instance);
     if (target_can == NULL) {
         user_error_handler(ERROR_CAN_INVALID_CONTEXT, "Invalid CAN instance in Tx packet");
         return false;
@@ -741,8 +816,12 @@ CANInstance get_can_instance_from_hcan(CAN_HandleTypeDef *hcan) {
  * 6. Logs valid packet data for further debugging or record-keeping.
  *
  * @param packet Pointer to the CANPacket structure containing the received data.
+ *
+ * ** DO NOT FREE PACKET. void __rtos__StartCAN_Rx_Task(CANInstance enum_can_instance) is the function that called this.
+ * ** the calling function will free the packet after this function returns.
  */
-void process_can_rx_packet(CAN_Packet *packet) {
+
+void process_can_rx_packet(Circular_Queue_Types queue_enum, CANInstance can_instance_enum, CAN_Packet *packet) {
     // Step 1: Validate the input
     if (packet == NULL) {
         user_error_handler(ERROR_CAN_PACKET_NULL, "Received null CANPacket");
@@ -770,8 +849,26 @@ void process_can_rx_packet(CAN_Packet *packet) {
         return; // Exit early if the data is invalid
     }
 
-    // Step 6: Locate the device configuration for the CAN ID
-    CANDeviceConfig *device_config = get_device_config_by_id(packet->header.id);
+    log_valid_can_data(&parsed_data);
+
+    // This is a bit confusing... so listen up
+    // get_device_config_id_by returns either the request or reply StdId.
+    // When receiving a reply from CAN_TRUCK, then
+    //      the id.reply StdId for the device is used (since the truck is replying to a read request)
+    // When receiving a reply from CAN_AUX, then
+    //      the id.request StdId for the device is used (since the aux is listening for a read request)
+
+    // We're using the PACKET flow to have get_device_config_by_id look for either the reply or request StdId
+    // even though we're dealing with the RX queue.
+    CAN_Packet_Flow flow = PACKET_RX;
+
+    // reverse the flow variable sent to get_device_config_by_id
+    // this will make get_device_config_by_id search for the request StdId instead of the reply StdId
+    if (can_instance_enum == CAN_TRUCK)
+    	flow = PACKET_TX;
+
+    CANDeviceConfig *device_config = get_device_config_by_id(packet->header.id, flow);
+
     if (device_config == NULL) {
         char error_msg[64];
         snprintf(error_msg, sizeof(error_msg), "Device configuration not found for CAN ID: 0x%" PRIX32, packet->header.id);
@@ -789,9 +886,24 @@ void process_can_rx_packet(CAN_Packet *packet) {
         return; // Exit if no matching PID configuration is found
     }
 
-    // Step 8: Update the signal states based on the parsed data
-    process_signal_changes(pid_config, parsed_data.payload);
+    switch (can_instance_enum)
+    {
+    	case CAN_TRUCK:
+    	    // Step 8: Update the signal states based on the parsed data
+    	    process_signal_changes(pid_config, parsed_data.payload);
+    		break;
+    	case CAN_AUX:
+    		CANInstance reply_enum = CAN_TRUCK;
+    		send_can_packet_to_tx_queue(reply_enum, device_config, pid_config, CAN_VERB_REPLY);
+    		break;
+    	default:
+    		char error_msg[255];
+            snprintf(error_msg, sizeof(error_msg), "%s: Invalid CAN Instance enum: %du", __func__, can_instance_enum);
+            user_error_handler(ERROR_CAN_DEVICE_NOT_FOUND, error_msg);
+            return; // Exit if no matching PID configuration is found
+    }
 
-    // Step 9: Log the validated and processed CAN data for debugging
-    log_valid_can_data(&parsed_data);
+    // ** DO NOT FREE PACKET. void __rtos__StartCAN_Rx_Task(CANInstance enum_can_instance) is the function that called this.
+    // ** the calling function will free the packet after this function returns.
 }
+

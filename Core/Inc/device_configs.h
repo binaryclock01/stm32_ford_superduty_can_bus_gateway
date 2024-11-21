@@ -10,7 +10,7 @@
 
 #include <stdint.h>   // For uint8_t, uint32_t types
 #include <stdbool.h>  // For boolean support
-#include "main.h"
+#include "can_common.h"
 
 /* -----------------------------------------------------------------------------
    Constants and Macros
@@ -27,16 +27,27 @@
    -------------------------------------------------------------------------- */
 #define CAN_ID_HEARTBEAT 0x59E  // Heartbeat message
 
+typedef enum {
+	CAN_ID_BCM_REQUEST = 0x726,
+	CAN_ID_BCM_REPLY = 0x72E,
+	CAN_ID_SCCM_REQUEST = 0x724,
+	CAN_ID_SCCM_REPLY = 0x72C,
+} CAN_StdIds;
 
+typedef struct {
+	uint32_t request;
+	uint32_t reply;
+} CAN_StdId_Type;
 
 typedef enum {
-    CAN_ID_BCM = 0x72E,   // Body Control Module CAN ID
-    CAN_ID_SCCM = 0x72C,  // Steering Column Control Module CAN ID
-} CAN_IDs;
+    CAN_ID_BCM = 0,   // Body Control Module CAN ID
+    CAN_ID_SCCM,  // Steering Column Control Module CAN ID
+	CAN_ID_TOTAL,
+} CAN_Ids;
 
 // Function to calculate request ID based on reply CAN ID
-static inline uint32_t get_request_id(CAN_IDs module_id) {
-    return module_id - CAN_ID_REQUEST_REPLY_OFFSET;
+static inline uint32_t get_request_id(CAN_Ids module_id) {
+    return module_id;
 }
 
 typedef enum {
@@ -85,7 +96,7 @@ typedef struct {
 
 typedef struct {
     const char *device_name;              // Device name (e.g., "BCM", "SCCM")
-    CAN_IDs can_id;                       // CAN ID for the device
+    CAN_StdId_Type id;                       // CAN ID for the device
     CANDevicePID *pids;                   // Pointer to PIDs
     uint8_t pid_count;                     // Number of PIDs
 } CANDeviceConfig;

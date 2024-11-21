@@ -65,10 +65,15 @@ CANDevicePID sccm_pids[] = {
 };
 
 
-// Device Configurations Array
+// Order aligns to
+//
+//    CAN_ID_BCM = 0,   // Body Control Module CAN ID
+//    CAN_ID_SCCM,  // Steering Column Control Module CAN ID
+//
+// Which is a typedef enum CAN_Ids in device_config.h.  Ensure they stay the same!!
 CANDeviceConfig can_devices[CAN_DEVICE_COUNT] = {
-    { .device_name = "BCM", .can_id = CAN_ID_BCM, .pids = bcm_pids, .pid_count = BCM_PID_COUNT },
-    { .device_name = "SCCM", .can_id = CAN_ID_SCCM, .pids = sccm_pids, .pid_count = SCCM_PID_COUNT }
+    { .device_name = "BCM", .id.request = CAN_ID_BCM_REQUEST, .id.reply = CAN_ID_BCM_REPLY, .pids = bcm_pids, .pid_count = BCM_PID_COUNT },
+    { .device_name = "SCCM", .id.request = CAN_ID_SCCM_REQUEST, .id.reply = CAN_ID_SCCM_REPLY, .pids = sccm_pids, .pid_count = SCCM_PID_COUNT }
 };
 
 // Command Definitions

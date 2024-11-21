@@ -19,14 +19,15 @@ extern "C" {
 #include <stdint.h>             // Fixed-width integer types
 #include <stdbool.h>            // Boolean support
 #include "device_configs.h"     // CANDeviceConfig, CANDevicePID, etc.
-#include "main.h"               // HAL_CAN definitions
+#include "can_common.h"
+#include "rtos.h"
+/*
 #include "ui.h"                 // Console message utilities
 #include "error.h"              // Error handling utilities
 #include "utils.h"
 #include "cmsis_os.h"        // RTOS CMSIS types, such as osMutedId_t
 #include "rtos.h"
-#include "can_common.h"
-
+*/
 /* -----------------------------------------------------------------------------
    Constants and Macros
    -------------------------------------------------------------------------- */
@@ -54,7 +55,16 @@ extern "C" {
 
 /* --- Initialization and Setup Functions --- */
 
-bool __rtos__process_tx_queue_and_send_to_can1(CAN_Packet *packet);
+osMessageQueueId_t *get_queue_handle_by_queue_num(Circular_Queue_Types queue_num);
+Circular_Queue_Types get_queue_num_by_can_instance(CANInstance can_instance, Queue_Type_Flow queue_type);
+osMessageQueueId_t get_queue_handle_by_can_instance(CANInstance can_instance, Queue_Type_Flow flow_dir);
+
+void send_reply_to_request(CANDevicePID *pid_config, Parsed_CAN_Data parsed_can_data);
+
+void log_can_message(uint64_t request_id, uint8_t *TxData, uint8_t dlc);
+
+
+CAN_HandleTypeDef *get_hcan_from_instance(CANInstance instance);
 
 void create_can_tx_header(CAN_TxHeaderTypeDef *tx_header, uint32_t std_id);
 
@@ -70,6 +80,8 @@ void create_can_tx_header(CAN_TxHeaderTypeDef *tx_header, uint32_t std_id);
 void generate_can_tx_read_data_payload(CANDeviceConfig *device, CANDevicePID *pid, uint8_t *TxData);
 
 /* --- CAN Message Handling Functions --- */
+
+CAN_HandleTypeDef *get_hcan_from_instance(CANInstance instance);
 
 /**
  * @brief Retrieves the CAN instance for the given hardware instance.
@@ -88,7 +100,7 @@ CANInstance get_can_instance_enum(CAN_HandleTypeDef *hcan);
  *
  * @param packet Pointer to the CAN_Packet to be processed.
  */
-void process_can_rx_packet(CAN_Packet *packet);
+void process_can_rx_packet(Circular_Queue_Types queue_enum, CANInstance enum_can_instance, CAN_Packet *packet);
 
 /**
  * @brief Retrieve a CAN message and populate a CAN_Packet for the specified CAN instance.
@@ -149,7 +161,7 @@ bool validate_parsed_can_data(const Parsed_CAN_Data *parsed_data);
  * @param rx_id The CAN ID to search for.
  * @return Pointer to the matching CANDeviceConfig, or NULL if not found.
  */
-CANDeviceConfig *get_device_config_by_id(uint32_t rx_id);
+CANDeviceConfig *get_device_config_by_id(uint32_t stdid, CAN_Packet_Flow flow);
 
 /**
  * @brief Retrieve a PID configuration by PID.

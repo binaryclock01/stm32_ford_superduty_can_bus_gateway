@@ -16,7 +16,9 @@
 extern "C" {
 #endif
 
-#include <stdint.h> // Fixed-width integer types
+#include <stdint.h> // Fixed-width integer type
+#include "device_configs.h"
+#include "main.h"
 
 /* -----------------------------------------------------------------------------
    Constants
@@ -36,6 +38,12 @@ typedef enum {
     CAN_AUX,   /**< Auxiliary CAN bus (CAN2) */
     CAN_TOTAL  /**< Total number of CAN instances */
 } CANInstance;
+
+typedef enum {
+	CAN_VERB_UNKNOWN,
+	CAN_VERB_REQUEST,
+	CAN_VERB_REPLY,
+} CAN_Verb_Type;
 
 typedef enum {
     PACKET_RX,
@@ -107,6 +115,9 @@ typedef struct {
     CAN_PID pid;        /**< Parsed PID from the CAN message. */
     CAN_Payload_uint32 payload;    /**< Extracted payload from the CAN message. */
 } Parsed_CAN_Data;
+
+
+
 
 #ifdef __cplusplus
 }

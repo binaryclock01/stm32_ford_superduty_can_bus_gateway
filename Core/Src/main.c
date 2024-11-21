@@ -30,8 +30,12 @@
 #include "ssd1306.h" // for OLED screen https://github.com/afiskon/stm32-ssd1306
 #include "ssd1306_fonts.h"
 #include "ui.h"
+#include "error.h"
 #include "device_configs.h"
 #include "rtos.h"
+#include "can_core.h"
+#include "utils.h"
+
 
 int _write(int file, char *data, int len) {
     // Use HAL_UART_Transmit to send data to UART2
@@ -60,7 +64,15 @@ int _write(int file, char *data, int len) {
 CAN_HandleTypeDef hcan1;
 CAN_HandleTypeDef hcan2;
 
+CRC_HandleTypeDef hcrc;
+
 I2C_HandleTypeDef hi2c1;
+
+SPI_HandleTypeDef hspi1;
+DMA_HandleTypeDef hdma_spi1_tx;
+
+TIM_HandleTypeDef htim3;
+TIM_HandleTypeDef htim14;
 
 UART_HandleTypeDef huart2;
 
@@ -68,21 +80,21 @@ UART_HandleTypeDef huart2;
 osThreadId_t CAN1_Rx_TaskHandle;
 const osThreadAttr_t CAN1_Rx_Task_attributes = {
   .name = "CAN1_Rx_Task",
-  .stack_size = 1024 * 4,
+  .stack_size = 256 * 4,
   .priority = (osPriority_t) osPriorityHigh,
 };
 /* Definitions for CAN2_Rx_Task */
 osThreadId_t CAN2_Rx_TaskHandle;
 const osThreadAttr_t CAN2_Rx_Task_attributes = {
   .name = "CAN2_Rx_Task",
-  .stack_size = 512 * 4,
+  .stack_size = 256 * 4,
   .priority = (osPriority_t) osPriorityHigh,
 };
-/* Definitions for Tx_Task */
-osThreadId_t Tx_TaskHandle;
-const osThreadAttr_t Tx_Task_attributes = {
-  .name = "Tx_Task",
-  .stack_size = 512 * 4,
+/* Definitions for CAN1_Tx_Task */
+osThreadId_t CAN1_Tx_TaskHandle;
+const osThreadAttr_t CAN1_Tx_Task_attributes = {
+  .name = "CAN1_Tx_Task",
+  .stack_size = 256 * 4,
   .priority = (osPriority_t) osPriorityNormal,
 };
 /* Definitions for Housekeeping_Ta */
@@ -96,8 +108,15 @@ const osThreadAttr_t Housekeeping_Ta_attributes = {
 osThreadId_t CAN1_Send_RequeHandle;
 const osThreadAttr_t CAN1_Send_Reque_attributes = {
   .name = "CAN1_Send_Reque",
-  .stack_size = 512 * 4,
+  .stack_size = 256 * 4,
   .priority = (osPriority_t) osPriorityAboveNormal,
+};
+/* Definitions for CAN2_Tx_Task */
+osThreadId_t CAN2_Tx_TaskHandle;
+const osThreadAttr_t CAN2_Tx_Task_attributes = {
+  .name = "CAN2_Tx_Task",
+  .stack_size = 256 * 4,
+  .priority = (osPriority_t) osPriorityNormal,
 };
 /* USER CODE BEGIN PV */
 
@@ -109,24 +128,35 @@ const osMessageQueueAttr_t CAN2_Rx_Queue_attributes = {
   .name = "CAN2_Rx_Queue"
 };
 
-const osMessageQueueAttr_t Tx_Queue_attributes = {
-  .name = "Tx_Queue"
+const osMessageQueueAttr_t CAN1_Tx_Queue_attributes = {
+  .name = "CAN1_Tx_Queue"
 };
+
+const osMessageQueueAttr_t CAN2_Tx_Queue_attributes = {
+  .name = "CAN2_Tx_Queue"
+};
+
 
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
+static void MX_DMA_Init(void);
 static void MX_CAN1_Init(void);
 static void MX_I2C1_Init(void);
 static void MX_CAN2_Init(void);
 static void MX_USART2_UART_Init(void);
+static void MX_SPI1_Init(void);
+static void MX_CRC_Init(void);
+static void MX_TIM3_Init(void);
+static void MX_TIM14_Init(void);
 void StartCAN1_Rx_Task(void *argument);
 void StartCAN2_Rx_Task(void *argument);
-void Start_Tx_Task(void *argument);
+void StartCAN1_Tx_Task(void *argument);
 void StartHousekeeping_Task(void *argument);
 void StartCAN_Tx_Send_Requests(void *argument);
+void StartCAN2_Tx_Task(void *argument);
 
 /* USER CODE BEGIN PFP */
 
@@ -233,10 +263,15 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_DMA_Init();
   MX_CAN1_Init();
   MX_I2C1_Init();
   MX_CAN2_Init();
   MX_USART2_UART_Init();
+  MX_SPI1_Init();
+  MX_CRC_Init();
+  MX_TIM3_Init();
+  MX_TIM14_Init();
   /* USER CODE BEGIN 2 */
 
   ssd1306_Init(); // init OLED screen
@@ -281,18 +316,23 @@ int main(void)
 
   /* USER CODE BEGIN RTOS_QUEUES */
 
-  CAN1_Rx_QueueHandle = osMessageQueueNew(CAN_PACKET_POOL_SIZE, sizeof(CAN_Packet *), &CAN1_Rx_Queue_attributes);
-  if (CAN1_Rx_QueueHandle == NULL) {
+  can_circular_buffer[QUEUE_RX_CAN1].queue_handle = osMessageQueueNew(CAN_PACKET_POOL_SIZE, sizeof(CAN_Packet *), &CAN1_Rx_Queue_attributes);
+  if (can_circular_buffer[QUEUE_RX_CAN1].queue_handle == NULL) {
       user_error_handler(ERROR_RTOS_QUEUE_INIT_FAILED, "Failed to create CAN1 Rx queue");
   }
-  CAN2_Rx_QueueHandle = osMessageQueueNew(CAN_PACKET_POOL_SIZE, sizeof(CAN_Packet *), &CAN2_Rx_Queue_attributes);
-  if (CAN2_Rx_QueueHandle == NULL) {
+  can_circular_buffer[QUEUE_RX_CAN2].queue_handle = osMessageQueueNew(CAN_PACKET_POOL_SIZE, sizeof(CAN_Packet *), &CAN2_Rx_Queue_attributes);
+  if (can_circular_buffer[QUEUE_RX_CAN2].queue_handle == NULL) {
       user_error_handler(ERROR_RTOS_QUEUE_INIT_FAILED, "Failed to create CAN2 Rx queue");
   }
-  Tx_QueueHandle = osMessageQueueNew(CAN_PACKET_POOL_SIZE, sizeof(CAN_Packet *), &Tx_Queue_attributes);
-  if (Tx_QueueHandle == NULL) {
-	  user_error_handler(ERROR_RTOS_QUEUE_INIT_FAILED, "Failed to create Tx queue");
+  can_circular_buffer[QUEUE_TX_CAN1].queue_handle = osMessageQueueNew(CAN_PACKET_POOL_SIZE, sizeof(CAN_Packet *), &CAN1_Tx_Queue_attributes);
+  if (can_circular_buffer[QUEUE_TX_CAN1].queue_handle == NULL) {
+	  user_error_handler(ERROR_RTOS_QUEUE_INIT_FAILED, "Failed to create CAN1 Tx queue");
   }
+  can_circular_buffer[QUEUE_TX_CAN2].queue_handle = osMessageQueueNew(CAN_PACKET_POOL_SIZE, sizeof(CAN_Packet *), &CAN2_Tx_Queue_attributes);
+  if (can_circular_buffer[QUEUE_TX_CAN1].queue_handle == NULL) {
+	  user_error_handler(ERROR_RTOS_QUEUE_INIT_FAILED, "Failed to create CAN2 Tx queue");
+  }
+
 
   /* USER CODE END RTOS_QUEUES */
 
@@ -303,14 +343,17 @@ int main(void)
   /* creation of CAN2_Rx_Task */
   CAN2_Rx_TaskHandle = osThreadNew(StartCAN2_Rx_Task, NULL, &CAN2_Rx_Task_attributes);
 
-  /* creation of Tx_Task */
-  Tx_TaskHandle = osThreadNew(Start_Tx_Task, NULL, &Tx_Task_attributes);
+  /* creation of CAN1_Tx_Task */
+  CAN1_Tx_TaskHandle = osThreadNew(StartCAN1_Tx_Task, NULL, &CAN1_Tx_Task_attributes);
 
   /* creation of Housekeeping_Ta */
   Housekeeping_TaHandle = osThreadNew(StartHousekeeping_Task, NULL, &Housekeeping_Ta_attributes);
 
   /* creation of CAN1_Send_Reque */
   CAN1_Send_RequeHandle = osThreadNew(StartCAN_Tx_Send_Requests, NULL, &CAN1_Send_Reque_attributes);
+
+  /* creation of CAN2_Tx_Task */
+  CAN2_Tx_TaskHandle = osThreadNew(StartCAN2_Tx_Task, NULL, &CAN2_Tx_Task_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
 
@@ -480,6 +523,32 @@ static void MX_CAN2_Init(void)
 }
 
 /**
+  * @brief CRC Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_CRC_Init(void)
+{
+
+  /* USER CODE BEGIN CRC_Init 0 */
+
+  /* USER CODE END CRC_Init 0 */
+
+  /* USER CODE BEGIN CRC_Init 1 */
+
+  /* USER CODE END CRC_Init 1 */
+  hcrc.Instance = CRC;
+  if (HAL_CRC_Init(&hcrc) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN CRC_Init 2 */
+
+  /* USER CODE END CRC_Init 2 */
+
+}
+
+/**
   * @brief I2C1 Initialization Function
   * @param None
   * @retval None
@@ -510,6 +579,138 @@ static void MX_I2C1_Init(void)
   /* USER CODE BEGIN I2C1_Init 2 */
 
   /* USER CODE END I2C1_Init 2 */
+
+}
+
+/**
+  * @brief SPI1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_SPI1_Init(void)
+{
+
+  /* USER CODE BEGIN SPI1_Init 0 */
+
+  /* USER CODE END SPI1_Init 0 */
+
+  /* USER CODE BEGIN SPI1_Init 1 */
+
+  /* USER CODE END SPI1_Init 1 */
+  /* SPI1 parameter configuration*/
+  hspi1.Instance = SPI1;
+  hspi1.Init.Mode = SPI_MODE_MASTER;
+  hspi1.Init.Direction = SPI_DIRECTION_2LINES;
+  hspi1.Init.DataSize = SPI_DATASIZE_8BIT;
+  hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
+  hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
+  hspi1.Init.NSS = SPI_NSS_SOFT;
+  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
+  hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
+  hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
+  hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
+  hspi1.Init.CRCPolynomial = 10;
+  if (HAL_SPI_Init(&hspi1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN SPI1_Init 2 */
+
+  /* USER CODE END SPI1_Init 2 */
+
+}
+
+/**
+  * @brief TIM3 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM3_Init(void)
+{
+
+  /* USER CODE BEGIN TIM3_Init 0 */
+
+  /* USER CODE END TIM3_Init 0 */
+
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+  TIM_OC_InitTypeDef sConfigOC = {0};
+
+  /* USER CODE BEGIN TIM3_Init 1 */
+
+  /* USER CODE END TIM3_Init 1 */
+  htim3.Instance = TIM3;
+  htim3.Init.Prescaler = 10000;
+  htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim3.Init.Period = 100;
+  htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_PWM_Init(&htim3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim3, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sConfigOC.OCMode = TIM_OCMODE_PWM1;
+  sConfigOC.Pulse = 0;
+  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+  if (HAL_TIM_PWM_ConfigChannel(&htim3, &sConfigOC, TIM_CHANNEL_2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM3_Init 2 */
+
+  /* USER CODE END TIM3_Init 2 */
+  HAL_TIM_MspPostInit(&htim3);
+
+}
+
+/**
+  * @brief TIM14 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM14_Init(void)
+{
+
+  /* USER CODE BEGIN TIM14_Init 0 */
+
+  /* USER CODE END TIM14_Init 0 */
+
+  TIM_OC_InitTypeDef sConfigOC = {0};
+
+  /* USER CODE BEGIN TIM14_Init 1 */
+
+  /* USER CODE END TIM14_Init 1 */
+  htim14.Instance = TIM14;
+  htim14.Init.Prescaler = 8399;
+  htim14.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim14.Init.Period = 166;
+  htim14.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim14.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim14) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_TIM_PWM_Init(&htim14) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sConfigOC.OCMode = TIM_OCMODE_PWM1;
+  sConfigOC.Pulse = 0;
+  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+  if (HAL_TIM_PWM_ConfigChannel(&htim14, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM14_Init 2 */
+
+  /* USER CODE END TIM14_Init 2 */
 
 }
 
@@ -547,6 +748,22 @@ static void MX_USART2_UART_Init(void)
 }
 
 /**
+  * Enable DMA controller clock
+  */
+static void MX_DMA_Init(void)
+{
+
+  /* DMA controller clock enable */
+  __HAL_RCC_DMA2_CLK_ENABLE();
+
+  /* DMA interrupt init */
+  /* DMA2_Stream3_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA2_Stream3_IRQn, 5, 0);
+  HAL_NVIC_EnableIRQ(DMA2_Stream3_IRQn);
+
+}
+
+/**
   * @brief GPIO Initialization Function
   * @param None
   * @retval None
@@ -560,10 +777,17 @@ static void MX_GPIO_Init(void)
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOH_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
+  __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOC, DISPL_CS_Pin|TOUCH_CS_Pin, GPIO_PIN_SET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOB, DISPL_DC_Pin|DISPL_RST_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : PA5 */
   GPIO_InitStruct.Pin = GPIO_PIN_5;
@@ -571,6 +795,30 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : DISPL_CS_Pin TOUCH_CS_Pin */
+  GPIO_InitStruct.Pin = DISPL_CS_Pin|TOUCH_CS_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : DISPL_DC_Pin DISPL_RST_Pin */
+  GPIO_InitStruct.Pin = DISPL_DC_Pin|DISPL_RST_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : TOUCH_INT_Pin */
+  GPIO_InitStruct.Pin = TOUCH_INT_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  HAL_GPIO_Init(TOUCH_INT_GPIO_Port, &GPIO_InitStruct);
+
+  /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(EXTI15_10_IRQn, 5, 0);
+  HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
 
 /* USER CODE BEGIN MX_GPIO_Init_2 */
 /* USER CODE END MX_GPIO_Init_2 */
@@ -597,16 +845,8 @@ void StartCAN1_Rx_Task(void *argument)
   /* USER CODE BEGIN 5 */
   /* Infinite loop */
   for (;;) {
-	  CAN_Packet *packet = NULL; // Step 1: Declare a pointer to a CAN_Packet
-
-	  // Step 2: Wait for a packet from the CAN2 queue
-	  if (osMessageQueueGet(CAN1_Rx_QueueHandle, &packet, NULL, osWaitForever) == osOK) {
-		  if (packet != NULL) {
-			  process_can_rx_packet(packet); // Step 3: Process the received packet
-			  _free_can_packet_from_circular_buffer(QUEUE_RX_CAN1, packet);    // Step 4: Return the packet to the pool
-		  }
-	  }
-	  osThreadYield();
+	  __rtos__StartCAN_Rx_Task(CAN_TRUCK);
+	  osDelay(1);
   }
   /* USER CODE END 5 */
 }
@@ -627,52 +867,29 @@ void StartCAN2_Rx_Task(void *argument)
 {
   /* USER CODE BEGIN StartCAN2_Rx_Task */
   for (;;) {
-      CAN_Packet *packet = NULL; // Step 1: Declare a pointer to a CAN_Packet
-
-      // Step 2: Wait for a packet from the CAN2 queue
-      if (osMessageQueueGet(CAN2_Rx_QueueHandle, &packet, NULL, osWaitForever) == osOK) {
-          if (packet != NULL) {
-              process_can_rx_packet(packet); // Step 3: Process the received packet
-              _free_can_packet_from_circular_buffer(QUEUE_RX_CAN2, packet);    // Step 4: Return the packet to the pool
-          }
-      }
-      osThreadYield();
+	  __rtos__StartCAN_Rx_Task(CAN_AUX);
+	  osDelay(1);
   }
   /* USER CODE END StartCAN2_Rx_Task */
 }
 
-/* USER CODE BEGIN Header_Start_Tx_Task */
+/* USER CODE BEGIN Header_StartCAN1_Tx_Task */
 /**
-* @brief Function implementing the Tx_Task thread.
-*        This task retrieves messages from the Tx queue and sends them to the CAN bus.
+* @brief Function implementing the CAN1_Tx_Task thread.
 * @param argument: Not used
 * @retval None
 */
-/* USER CODE END Header_Start_Tx_Task */
-void Start_Tx_Task(void *argument)
+/* USER CODE END Header_StartCAN1_Tx_Task */
+void StartCAN1_Tx_Task(void *argument)
 {
-    /* Infinite loop */
-    for (;;) {
-        CAN_Packet *packet = NULL; // Pointer to hold the dequeued CAN packet
-
-        // Wait for a CAN packet from the Tx queue
-        if (osMessageQueueGet(Tx_QueueHandle, &packet, NULL, osWaitForever) == osOK) {
-            if (packet != NULL) {
-                // Process and send the CAN packet
-                if (!__rtos__process_tx_queue_and_send_to_can1(packet)) {
-                    // Log or handle error if transmission fails
-                    send_console_msg("Failed to transmit CAN message.");
-                }
-
-                // Optional: Free or reuse the packet
-                _free_can_packet_from_circular_buffer(QUEUE_TX, packet);
-            }
-        }
-
-        // Yield CPU time to other tasks
-        osThreadYield();
-    }
-  /* USER CODE END Start_Tx_Task */
+  /* USER CODE BEGIN StartCAN1_Tx_Task */
+  /* Infinite loop */
+  for(;;)
+  {
+	__rtos__StartCAN_Tx_Task(CAN_TRUCK);
+    osDelay(1);
+  }
+  /* USER CODE END StartCAN1_Tx_Task */
 }
 
 /* USER CODE BEGIN Header_StartHousekeeping_Task */
@@ -707,15 +924,13 @@ void StartHousekeeping_Task(void *argument)
 * @retval None
 */
 /* USER CODE END Header_StartCAN_Tx_Send_Requests */
-
-/* USER CODE BEGIN StartCAN_Tx_Send_Requests */
-
 void StartCAN_Tx_Send_Requests(void *argument)
 {
+  /* USER CODE BEGIN StartCAN_Tx_Send_Requests */
   /* Infinite loop */
   for (;;)
   {
-	  uint32_t queue_length = osMessageQueueGetCount(Tx_QueueHandle);
+	  uint32_t queue_length = osMessageQueueGetCount(can_circular_buffer[QUEUE_TX_CAN1].queue_handle);
 	  char msg[100];
 	  if (queue_length > 7)
 		  sprintf(msg, "Cannot send Tx requests - Tx_QueueHandle has %lu elements and it would overflow the buffer.", queue_length);
@@ -734,6 +949,25 @@ void StartCAN_Tx_Send_Requests(void *argument)
 
   }
   /* USER CODE END StartCAN_Tx_Send_Requests */
+}
+
+/* USER CODE BEGIN Header_StartCAN2_Tx_Task */
+/**
+* @brief Function implementing the CAN2_Tx_Task thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartCAN2_Tx_Task */
+void StartCAN2_Tx_Task(void *argument)
+{
+  /* USER CODE BEGIN StartCAN2_Tx_Task */
+  /* Infinite loop */
+  for(;;)
+  {
+		__rtos__StartCAN_Tx_Task(CAN_TRUCK);
+		osDelay(1);
+  }
+  /* USER CODE END StartCAN2_Tx_Task */
 }
 
 /**

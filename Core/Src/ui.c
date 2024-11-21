@@ -133,8 +133,8 @@ void draw_screen_data_states(CANInstance can_instance) {
 	if (can_instance == CAN_AUX)
 		queue_type = QUEUE_RX_CAN2;
 
-	uint32_t rxcount = can_circular_buffer[queue_type].count;
-	uint32_t txcount = can_circular_buffer[QUEUE_TX].count;
+	uint32_t rxcount = can_circular_buffer[QUEUE_RX_CAN1].meta.total_packets;
+	uint32_t txcount = can_circular_buffer[QUEUE_TX_CAN1].meta.total_packets;
 
     // Clear the state display area (top of the screen)
     ssd1306_FillRectangle(0, 0, SSD1306_WIDTH, STATE_LINES * SCREEN_FONT_HEIGHT, Black);
