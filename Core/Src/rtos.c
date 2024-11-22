@@ -84,7 +84,7 @@ CAN_Packet *_allocate_can_packet_on_circular_buffer(Circular_Queue_Types queue_t
     }
 
     // Allocate the next available packet
-    CAN_Packet *packet = &buffer->packets[buffer->head];
+    CAN_Packet *packet = &(buffer->packets[buffer->head]);
 
     // Update the head index and increment the count
     buffer->head = (buffer->head + 1) % CAN_BUFFER_SIZE;
@@ -163,13 +163,9 @@ bool __rtos_send_tx_packet_to_can_interface(CANInstance enum_can_instance, CAN_P
 }
 */
 
-void __rtos_StartCAN2_Rx_Task() { __rtos__StartCAN_Rx_Task(CAN_AUX); }
-void __rtos_StartCAN1_Rx_Task() { __rtos__StartCAN_Rx_Task(CAN_TRUCK); }
 
-void __rtos__StartCAN_Rx_Task(CANInstance enum_can_instance)
+void __rtos__StartCAN_Rx_Task(CANInstance enum_can_instance, CAN_Packet *packet)
 {
-	CAN_Packet *packet = NULL; // Step 1: Declare a pointer to a CAN_Packet
-	osMessageQueueId_t queue_handle = NULL;
 	Circular_Queue_Types queue_enum = QUEUE_TYPE_UNKNOWN;
 
 	// TODO: probably a better way to do this with enums and structs, but this is what it is for now.
@@ -180,11 +176,9 @@ void __rtos__StartCAN_Rx_Task(CANInstance enum_can_instance)
 	switch (enum_can_instance)
 	{
 		case CAN_TRUCK:
-			queue_handle = can_circular_buffer[QUEUE_RX_CAN1].queue_handle;
 			queue_enum = QUEUE_RX_CAN1;
 			break;
 		case CAN_AUX:
-			queue_handle = can_circular_buffer[QUEUE_RX_CAN2].queue_handle;
 			queue_enum = QUEUE_RX_CAN2;
 			break;
 		default:
@@ -194,32 +188,21 @@ void __rtos__StartCAN_Rx_Task(CANInstance enum_can_instance)
 			return;
 	}
 
-	// Step 2: Wait for a packet from the CAN queue
-	if (osMessageQueueGet(queue_handle, &packet, NULL, osWaitForever) == osOK)
-	{
-		if (packet == NULL) {
-			char error_msg[255];
-			snprintf(error_msg, sizeof(error_msg), "%s: NULL packet, RX queue enum: %du **freed packet**", __func__, enum_can_instance);
-			user_error_handler(ERROR_RTOS_QUEUE_NULL_PACKET, error_msg);
-			_free_can_packet_using_queue_type_from_circular_buffer(queue_enum);
-			return;
-		}
-
-		if (packet != NULL) {
-		  process_can_rx_packet(queue_enum, enum_can_instance, packet); // Step 3: Process the received packet
-		  _free_can_packet_using_queue_type_from_circular_buffer(queue_enum);
-		}
+	if (packet == NULL) {
+		char error_msg[255];
+		snprintf(error_msg, sizeof(error_msg), "%s: NULL packet, RX queue enum: %du **freed packet**", __func__, enum_can_instance);
+		user_error_handler(ERROR_RTOS_QUEUE_NULL_PACKET, error_msg);
+		_free_can_packet_using_queue_type_from_circular_buffer(queue_enum);
+		return;
 	}
-	osThreadYield();
+
+
+	process_can_rx_packet(queue_enum, enum_can_instance, packet); // Step 3: Process the received packet
+	_free_can_packet_using_queue_type_from_circular_buffer(queue_enum);
 }
 
-void __rtos__StartCAN1_Tx_Task() { __rtos__StartCAN_Tx_Task(CAN_TRUCK); }
-void __rtos__StartCAN2_Tx_Task() { __rtos__StartCAN_Tx_Task(CAN_AUX); }
-
-void __rtos__StartCAN_Tx_Task(CANInstance enum_can_instance)
+void __rtos__StartCAN_Tx_Task(CANInstance enum_can_instance, CAN_Packet *packet)
 {
-	CAN_Packet *packet = NULL; // Step 1: Declare a pointer to a CAN_Packet
-	osMessageQueueId_t queue_handle = NULL;
 	Circular_Queue_Types queue_enum = QUEUE_TYPE_UNKNOWN;
 
 	// TODO: probably a better way to do this with enums and structs, but this is what it is for now.
@@ -230,11 +213,9 @@ void __rtos__StartCAN_Tx_Task(CANInstance enum_can_instance)
 	switch (enum_can_instance)
 	{
 		case CAN_TRUCK:
-			queue_handle = can_circular_buffer[QUEUE_TX_CAN1].queue_handle;
 			queue_enum = QUEUE_TX_CAN1;
 			break;
 		case CAN_AUX:
-			queue_handle = can_circular_buffer[QUEUE_TX_CAN2].queue_handle;
 			queue_enum = QUEUE_TX_CAN2;
 			break;
 		default:
@@ -244,25 +225,15 @@ void __rtos__StartCAN_Tx_Task(CANInstance enum_can_instance)
 			return;
 	}
 
-	// Wait for a CAN packet from the Tx queue
-	if (osMessageQueueGet(queue_handle, &packet, NULL, osWaitForever) == osOK) {
-		if (packet == NULL)
-		{
-			_free_can_packet_using_queue_type_from_circular_buffer(queue_enum);
-	    	char error_msg[255];
-	    	snprintf(error_msg, sizeof(error_msg), "%s: NULL packet, TX queue enum: %du, **freed packet**", __func__, enum_can_instance);
-	    	user_error_handler(ERROR_RTOS_QUEUE_NULL_PACKET, error_msg);
-			return;
-		}
-
-		// Process and send the CAN packet
-		// all error handling is in the function, so we don't need to do any here
-		// the function also frees any packets if failure and when it processes them
-		__rtos_send_tx_packet_to_can_interface(packet);
+	if (packet == NULL)
+	{
+		_free_can_packet_using_queue_type_from_circular_buffer(queue_enum);
+		char error_msg[255];
+		snprintf(error_msg, sizeof(error_msg), "%s: NULL packet, TX queue enum: %du, **freed packet**", __func__, enum_can_instance);
+		user_error_handler(ERROR_RTOS_QUEUE_NULL_PACKET, error_msg);
+		return;
 	}
-
-	// Yield CPU time to other tasks
-	osThreadYield();
+	__rtos_send_tx_packet_to_can_interface(packet);
 }
 
 
@@ -319,7 +290,7 @@ void process_can_rx_fifo_callback(CAN_HandleTypeDef *hcan) {
     }
 
     // Step 5: Enqueue the packet into the message queue
-    if (osMessageQueuePut(target_queue, &packet, 0, 0) != osOK) {
+    if (osMessageQueuePut(target_queue, packet, 0, 0) != osOK) {
         // Free the packet and log the error if the queue is full or unavailable
         _free_can_packet_using_queue_type_from_circular_buffer(queue_type);
         char error_msg[64];

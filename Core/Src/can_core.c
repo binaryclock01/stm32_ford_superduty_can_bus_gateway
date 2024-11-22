@@ -297,25 +297,27 @@ osMessageQueueId_t get_queue_handle_by_can_instance(CANInstance can_instance, Qu
 	if (can_instance == CAN_TRUCK)
 	{
 		if (flow_dir == QUEUE_TYPE_FLOW_RX)
-			return can_circular_buffer[QUEUE_RX_CAN1].queue_handle;
+			return &(can_circular_buffer[QUEUE_RX_CAN1].queue_handle);
 		else if (flow_dir == QUEUE_TYPE_FLOW_TX)
-			return can_circular_buffer[QUEUE_TX_CAN1].queue_handle;
+			return &(can_circular_buffer[QUEUE_TX_CAN1].queue_handle);
 	}
 	else if (can_instance == CAN_AUX)
 	{
 		if (flow_dir == QUEUE_TYPE_FLOW_RX)
-			return can_circular_buffer[QUEUE_RX_CAN2].queue_handle;
+			return &(can_circular_buffer[QUEUE_RX_CAN2].queue_handle);
 		else if (flow_dir == QUEUE_TYPE_FLOW_TX)
-			return can_circular_buffer[QUEUE_TX_CAN2].queue_handle;
+			return &(can_circular_buffer[QUEUE_TX_CAN2].queue_handle);
 	}
 
 	// if none matched, return NULL pointer
 	return NULL;
 }
 
-osMessageQueueId_t *get_queue_handle_by_queue_num(Circular_Queue_Types queue_num)
+// osMessageQueueId_t is a pointer that holds the queue_handle so don't return pointers to pointers!
+osMessageQueueId_t get_queue_handle_by_queue_num(Circular_Queue_Types queue_num)
 {
-	return &can_circular_buffer[queue_num].queue_handle;
+	// osMessageQueueId_t is a pointer that holds the queue_handle so don't return pointers to pointers!
+	return can_circular_buffer[queue_num].queue_handle;
 }
 
 /**
@@ -337,6 +339,8 @@ void send_can_packet_to_tx_queue(CANInstance can_instance, CANDeviceConfig *devi
 
     // Step 2: Get queue information
     Circular_Queue_Types queue_num = get_queue_num_by_can_instance(can_instance, QUEUE_TYPE_FLOW_TX);
+
+    // osMessageQueueId_t is a pointer that holds the queue_handle so don't return pointers to pointers!
     osMessageQueueId_t queue_handle = get_queue_handle_by_queue_num(queue_num);
 
     // Step 3: Allocate a CAN packet from the circular buffer
@@ -358,7 +362,7 @@ void send_can_packet_to_tx_queue(CANInstance can_instance, CANDeviceConfig *devi
     packet->header.id = verb_stdid;                            // Unique request ID
 
     // Step 6: Attempt to enqueue the packet
-    if (osMessageQueuePut(queue_handle, &packet, 0, 0) != osOK) {
+    if (osMessageQueuePut(queue_handle, packet, 0, 0) != osOK) {
         // Log failure to enqueue
         user_error_handler(ERROR_CAN_TRANSMIT_FAILED, "Failed to enqueue CAN packet into Tx queue");
 
@@ -394,6 +398,8 @@ void send_all_requests(void) {
         for (size_t pid_index = 0; pid_index < device->pid_count; pid_index++) {
             CANDevicePID *pid = &device->pids[pid_index];
             send_can_packet_to_tx_queue(CAN_TRUCK, device, pid, CAN_VERB_REQUEST);
+            osThreadYield();
+            osDelay(1000);
         }
     }
 }

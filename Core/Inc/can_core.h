@@ -55,9 +55,13 @@ extern "C" {
 
 /* --- Initialization and Setup Functions --- */
 
-osMessageQueueId_t *get_queue_handle_by_queue_num(Circular_Queue_Types queue_num);
+// osMessageQueueId_t is a pointer that holds the queue_handle so don't return pointers to pointers!
+osMessageQueueId_t get_queue_handle_by_queue_num(Circular_Queue_Types queue_num);
 Circular_Queue_Types get_queue_num_by_can_instance(CANInstance can_instance, Queue_Type_Flow queue_type);
+// osMessageQueueId_t is a pointer that holds the queue_handle so don't return pointers to pointers!
 osMessageQueueId_t get_queue_handle_by_can_instance(CANInstance can_instance, Queue_Type_Flow flow_dir);
+
+bool __rtos_send_tx_packet_to_can_interface(CAN_Packet *packet);
 
 void send_reply_to_request(CANDevicePID *pid_config, Parsed_CAN_Data parsed_can_data);
 

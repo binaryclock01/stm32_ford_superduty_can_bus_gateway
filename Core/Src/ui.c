@@ -128,10 +128,7 @@ void display_messages() {
  * @param can_instance The CAN instance (e.g., CAN_TRUCK or CAN_AUX) to display data for.
  */
 void draw_screen_data_states(CANInstance can_instance) {
-	Circular_Queue_Types queue_type = QUEUE_RX_CAN1;
 
-	if (can_instance == CAN_AUX)
-		queue_type = QUEUE_RX_CAN2;
 
 	uint32_t rxcount = can_circular_buffer[QUEUE_RX_CAN1].meta.total_packets;
 	uint32_t txcount = can_circular_buffer[QUEUE_TX_CAN1].meta.total_packets;

@@ -50,32 +50,19 @@ typedef struct {
     CAN_Circular_Buffer_Meta meta;
 } CAN_Circular_Buffer;
 
-
-/*
-extern osMessageQueueId_t CAN1_Rx_QueueHandle;
-extern osMessageQueueId_t CAN2_Rx_QueueHandle;
-extern osMessageQueueId_t CAN1_Tx_QueueHandle;
-extern osMessageQueueId_t CAN2_Tx_QueueHandle;
-*/
-
 extern CAN_Circular_Buffer can_circular_buffer[TOTAL_QUEUES];
-
-
-
 
 /**
  * @brief Main StartCAN_Rx_Task that will call __rtos_StartCAN_Rx#_Task() depending on the can instance
  */
-void __rtos__StartCAN_Rx_Task(CANInstance enum_can_instance);
-void __rtos_StartCAN1_Rx_Task();
-void __rtos_StartCAN2_Rx_Task();
+void __rtos__StartCAN_Rx_Task(CANInstance enum_can_instance, CAN_Packet *packet);
+
 
 /**
  * @brief Main StartCAN_Rx_Task that will call __rtos_StartCAN_Tx#_Task() depending on the can instance
  */
-void __rtos__StartCAN_Tx_Task(CANInstance enum_can_instance);
-void __rtos_StartCAN1_Tx_Task();
-void __rtos_StartCAN2_Tx_Task();
+void __rtos__StartCAN_Tx_Task(CANInstance enum_can_instance, CAN_Packet *packet);
+
 
 bool __rtos_process_tx_queue_and_send_to_can(CANInstance enum_can_instance, CAN_Packet *packet);
 
