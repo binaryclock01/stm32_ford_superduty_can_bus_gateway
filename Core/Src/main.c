@@ -29,12 +29,14 @@
 #include <stdbool.h> // for boolean support in c
 #include "ssd1306.h" // for OLED screen https://github.com/afiskon/stm32-ssd1306
 #include "ssd1306_fonts.h"
+#include "log.h"
 #include "ui.h"
 #include "error.h"
 #include "device_configs.h"
 #include "rtos.h"
 #include "can_core.h"
 #include "utils.h"
+
 
 
 int _write(int file, char *data, int len) {
@@ -274,9 +276,14 @@ int main(void)
   MX_TIM14_Init();
   /* USER CODE BEGIN 2 */
 
+  // uart logging system
+  init_log_system();
+  display_welcome_message();
+
+#ifdef USE_SSD1306
   ssd1306_Init(); // init OLED screen
   init_oled_data(); // zero all string data
-
+#endif
 
   // Initialize TRUCK CAN (hcan1)
   if (HAL_CAN_Start(&hcan1) != HAL_OK) {
@@ -844,7 +851,7 @@ void StartCAN1_Rx_Task(void *argument)
   /* Infinite loop */
   CAN_Packet *packet = NULL;
   for (;;) {
-		if (osMessageQueueGet(can_circular_buffer[QUEUE_RX_CAN1].queue_handle, packet, NULL, osWaitForever) == osOK)
+		if (osMessageQueueGet(can_circular_buffer[QUEUE_RX_CAN1].queue_handle, &packet, NULL, osWaitForever) == osOK)
 			__rtos__StartCAN_Rx_Task(CAN_TRUCK, packet);
   }
   /* USER CODE END 5 */
@@ -867,7 +874,7 @@ void StartCAN2_Rx_Task(void *argument)
   /* USER CODE BEGIN StartCAN2_Rx_Task */
 	CAN_Packet *packet = NULL;
 	for (;;) {
-		if (osMessageQueueGet(can_circular_buffer[QUEUE_RX_CAN2].queue_handle, packet, NULL, osWaitForever) == osOK)
+		if (osMessageQueueGet(can_circular_buffer[QUEUE_RX_CAN2].queue_handle, &packet, NULL, osWaitForever) == osOK)
 			__rtos__StartCAN_Rx_Task(CAN_AUX, packet);
 	}
   /* USER CODE END StartCAN2_Rx_Task */
@@ -888,7 +895,7 @@ void StartCAN1_Tx_Task(void *argument)
   for(;;)
   {
 	CAN_Packet *packet = NULL;
-	if (osMessageQueueGet(can_circular_buffer[QUEUE_TX_CAN1].queue_handle, packet, NULL, osWaitForever) == osOK)
+	if (osMessageQueueGet(can_circular_buffer[QUEUE_TX_CAN1].queue_handle, &packet, NULL, osWaitForever) == osOK)
 		__rtos__StartCAN_Tx_Task(CAN_TRUCK, packet);
   }
   /* USER CODE END StartCAN1_Tx_Task */
@@ -908,15 +915,14 @@ void StartHousekeeping_Task(void *argument)
 {
   /* USER CODE BEGIN StartHousekeeping_Task */
   for (;;) {
-	  osThreadSuspend(osThreadGetId());
-      // Step 1: Update OLED display for the specified CAN instance
+	__rtos__log_task();
+	// Yield to other threads without a fixed delay
+	osThreadYield();
+	  //osThreadSuspend(osThreadGetId());
+#ifdef USE_SSD1306
+	  // Step 1: Update OLED display for the specified CAN instance
       //update_oled_status(DEFAULT_OLED_CAN_INSTANCE);
-
-      // Step 2: Perform system health checks
-      // check_system_health(); // Uncomment if system health monitoring is implemented
-      //osThreadYield();
-
-//      osDelay(ONE_SECOND); // Delay task execution to run periodically (every 1000ms)
+#endif
   }
   /* USER CODE END StartHousekeeping_Task */
 }
@@ -950,6 +956,7 @@ void StartCAN_Tx_Send_Requests(void *argument)
       osThreadYield();
 
       osDelay(ONE_SECOND);
+      //osThreadYield();
 
   }
   /* USER CODE END StartCAN_Tx_Send_Requests */

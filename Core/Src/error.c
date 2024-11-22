@@ -9,6 +9,7 @@
 #include <string.h>  // For string manipulation
 #include "error.h"
 #include "ui.h"      // For sending console messages
+#include "ansi.h"
 
 /* -----------------------------------------------------------------------------
    Error Table
@@ -136,20 +137,26 @@ void user_error_handler(ErrorCodes error_code, const char *format, ...) {
     }
 
     // Log the error to the console with category and severity
-    printf("ER#%u [%s] (%s): %s%s%s\n",
+    printf(HBLK "* " REDHB "\e[1;97mERROR #%u" CRESET "["  // Bright red background and bold white text for ERROR
+           HBLU "%s" CRESET "] ("                         // Blue category in brackets
+           BYEL "%s" CRESET "): "                         // Yellow severity
+           BWHT "%s" CRESET                               // Bold white message
+           "%s%s\n\r",
            error_code,
            entry ? (entry->category == ERROR_CATEGORY_CAN ? "CAN" :
                     entry->category == ERROR_CATEGORY_RTOS ? "RTOS" :
                     entry->category == ERROR_CATEGORY_STORAGE ? "Storage" :
                     entry->category == ERROR_CATEGORY_UI ? "UI" : "General") : "Unknown",
            entry ? (entry->severity == ERROR_SEVERITY_CRITICAL ? "CRITICAL" :
-                    entry->severity == ERROR_SEVERITY_WARNING ? "WARNING" : "INFO") : "Unknown",
+                    entry->severity == ERROR_SEVERITY_WARNING ? "WARNING" :
+                    "INFO") : "Unknown",
            entry ? entry->message : "Error Unknown",
            format ? " - " : "",
-           format ? error_msg : "");
+           format ? error_msg: "");
+
 
     // Log the error to persistent storage
-    log_error_to_storage(error_code, format ? error_msg : NULL);
+    //log_error_to_storage(error_code, format ? error_msg : NULL);
 
     // Invoke the main error handler for critical errors
     if (entry && entry->severity == ERROR_SEVERITY_CRITICAL) {
@@ -162,6 +169,6 @@ void user_error_handler(ErrorCodes error_code, const char *format, ...) {
  */
 void log_error_to_storage(ErrorCodes error_code, const char *context) {
     // Example: Save the error to persistent storage (e.g., SD card or EEPROM)
-    printf("Persisting error: Code=%u, Context=%s\n", error_code, context ? context : "None");
+    printf("Persisting error: Code=%u, Context=%s\n\r", error_code, context ? context : "None");
     // TODO: Implement actual storage logic here
 }

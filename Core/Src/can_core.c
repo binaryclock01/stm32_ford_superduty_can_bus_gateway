@@ -362,7 +362,7 @@ void send_can_packet_to_tx_queue(CANInstance can_instance, CANDeviceConfig *devi
     packet->header.id = verb_stdid;                            // Unique request ID
 
     // Step 6: Attempt to enqueue the packet
-    if (osMessageQueuePut(queue_handle, packet, 0, 0) != osOK) {
+    if (osMessageQueuePut(queue_handle, &packet, 0, 0) != osOK) {
         // Log failure to enqueue
         user_error_handler(ERROR_CAN_TRANSMIT_FAILED, "Failed to enqueue CAN packet into Tx queue");
 
@@ -378,6 +378,8 @@ void send_can_packet_to_tx_queue(CANInstance can_instance, CANDeviceConfig *devi
         return;
     }
 
+//    CAN_Packet *packet_get;
+//    osMessageQueueGet(queue_handle, &packet_get, NULL, osWaitForever);
     // Step 7: Log the message for debugging
     log_can_message(verb_stdid, packet->payload, packet->header.dlc);
 }
@@ -398,8 +400,8 @@ void send_all_requests(void) {
         for (size_t pid_index = 0; pid_index < device->pid_count; pid_index++) {
             CANDevicePID *pid = &device->pids[pid_index];
             send_can_packet_to_tx_queue(CAN_TRUCK, device, pid, CAN_VERB_REQUEST);
-            osThreadYield();
-            osDelay(1000);
+
+            //osDelay(1000);
         }
     }
 }

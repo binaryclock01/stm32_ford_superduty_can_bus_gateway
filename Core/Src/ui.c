@@ -11,11 +11,15 @@
 #include <stdio.h>           // For snprintf
 #include <stdbool.h>         // For boolean support
 
-#include "main.h"
 #include "ui.h"
+
+#include "main.h"
+#include "log.h"
+
 #include "can_common.h"
 #include "ssd1306_fonts.h"
 #include "utils.h"
+
 
 
 /* ---| DISPLAY VARIABLES |-------------------------------------------------------------------- */
@@ -61,10 +65,12 @@ void scroll_messages() {
  * @param msg Pointer to the null-terminated message string to be displayed.
  */
 void send_console_msg(const char *msg) {
-	char uart_msg[255];
 
-	sprintf(uart_msg, "%s\r\n", msg);
-	HAL_UART_Transmit(&huart2, (uint8_t*)uart_msg, strlen(uart_msg), HAL_MAX_DELAY);
+	log_message(msg);
+
+#ifdef USE_SSD1306
+//	sprintf(uart_msg, "%s\r\n", msg);
+//	HAL_UART_Transmit(&huart2, (uint8_t*)uart_msg, strlen(uart_msg), HAL_MAX_DELAY);
     // Check if the message buffer is full and scroll if necessary
     if (screen_line >= MESSAGE_LINES) {
         scroll_messages();
@@ -81,6 +87,7 @@ void send_console_msg(const char *msg) {
 
     // Move to the next message line
     screen_line++;
+#endif
 }
 /**
  * @brief Update the OLED screen with the current state data and messages.

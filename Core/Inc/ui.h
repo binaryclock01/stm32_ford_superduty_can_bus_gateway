@@ -34,6 +34,8 @@ extern "C" {
 #define MESSAGE_LINES (SCREEN_MAX_CHAR_LINES - STATE_LINES) /**< Remaining lines for messages. */
 #define DEFAULT_OLED_CAN_INSTANCE CAN_TRUCK // Default CAN instance for OLED updates
 
+//#define USE_SSD1306
+
 extern char screen_data[SCREEN_MAX_CHAR_LINES][SCREEN_MAX_CHAR_WIDTH];
 extern char screen_data_states[SCREEN_MAX_CHAR_LINES][SCREEN_MAX_CHAR_WIDTH];
 extern uint8_t screen_line;
