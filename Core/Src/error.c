@@ -137,7 +137,7 @@ void user_error_handler(ErrorCodes error_code, const char *format, ...) {
     }
 
     // Log the error to the console with category and severity
-    printf(HBLK "* " REDHB "\e[1;97mERROR #%u" CRESET "["  // Bright red background and bold white text for ERROR
+    printf(HGRN "* " REDB "\e[1;97mERROR #%u" CRESET "["  // Bright red background and bold white text for ERROR
            HBLU "%s" CRESET "] ("                         // Blue category in brackets
            BYEL "%s" CRESET "): "                         // Yellow severity
            BWHT "%s" CRESET                               // Bold white message

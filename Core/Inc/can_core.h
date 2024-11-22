@@ -5,8 +5,8 @@
  * Author: Ryan
  *
  * Description:
- * This file declares functions and data structures for managing CAN communication,
- * including request building, message handling, and signal processing.
+ * This header declares functions and data structures for managing CAN communication,
+ * including initialization, message handling, and device-specific configurations.
  */
 
 #ifndef CAN_CORE_H_
@@ -19,63 +19,114 @@ extern "C" {
 #include <stdint.h>             // Fixed-width integer types
 #include <stdbool.h>            // Boolean support
 #include "device_configs.h"     // CANDeviceConfig, CANDevicePID, etc.
-#include "can_common.h"
-#include "rtos.h"
-/*
-#include "ui.h"                 // Console message utilities
-#include "error.h"              // Error handling utilities
-#include "utils.h"
-#include "cmsis_os.h"        // RTOS CMSIS types, such as osMutedId_t
-#include "rtos.h"
-*/
-/* -----------------------------------------------------------------------------
+#include "can_common.h"         // Common CAN utilities
+#include "rtos.h"               // RTOS utilities
+
+/* --------------------------------------------------------------------------
    Constants and Macros
    -------------------------------------------------------------------------- */
 
 #define CAN_REQUEST_INTERVAL (50 * ONE_MILLISECOND) /**< Interval for CAN requests in ms. */
-#define DLC_MAX 8 /**< Maximum data length for standard CAN frames */
+#define DLC_MAX 8                                   /**< Maximum data length for standard CAN frames */
+#define MAX_RETRIES 3                               /**< Maximum retries for CAN message transmission */
 
-#define MAX_RETRIES 3        // Maximum retries for CAN message transmission
-
-/* -----------------------------------------------------------------------------
-   Enumerations
-   -------------------------------------------------------------------------- */
-
-// Check can_common.h
-
-/* -----------------------------------------------------------------------------
-   Structures
-   -------------------------------------------------------------------------- */
-
-// Check can_common.h
-
-/* -----------------------------------------------------------------------------
+/* --------------------------------------------------------------------------
    Function Declarations
    -------------------------------------------------------------------------- */
 
 /* --- Initialization and Setup Functions --- */
 
-// osMessageQueueId_t is a pointer that holds the queue_handle so don't return pointers to pointers!
+/**
+ * @brief Initialize and start all CAN buses.
+ */
+void start_hal_can_buses(void);
+
+/**
+ * @brief Start a specific CAN bus and log the result.
+ *
+ * @param hcan Pointer to the HAL CAN handle.
+ * @param hcan_human_string Human-readable description of the CAN bus.
+ */
+void start_hal_can_bus(CAN_HandleTypeDef *hcan, const char *hcan_human_string);
+
+/* --- CAN Packet Queue Management --- */
+
+/**
+ * @brief Get the queue handle associated with a given queue number.
+ *
+ * @param queue_num The circular queue type.
+ * @return The queue handle.
+ */
 osMessageQueueId_t get_queue_handle_by_queue_num(Circular_Queue_Types queue_num);
-Circular_Queue_Types get_queue_num_by_can_instance(CANInstance can_instance, Queue_Type_Flow queue_type);
-// osMessageQueueId_t is a pointer that holds the queue_handle so don't return pointers to pointers!
+
+/**
+ * @brief Get the queue handle for a specific CAN instance and flow direction.
+ *
+ * @param can_instance The CAN instance (e.g., CAN_TRUCK or CAN_AUX).
+ * @param flow_dir The flow direction (e.g., QUEUE_TYPE_FLOW_TX or QUEUE_TYPE_FLOW_RX).
+ * @return The queue handle, or NULL if invalid.
+ */
 osMessageQueueId_t get_queue_handle_by_can_instance(CANInstance can_instance, Queue_Type_Flow flow_dir);
 
-bool __rtos_send_tx_packet_to_can_interface(CAN_Packet *packet);
+/**
+ * @brief Get the queue number associated with a specific CAN instance and flow direction.
+ *
+ * @param can_instance The CAN instance (e.g., CAN_TRUCK or CAN_AUX).
+ * @param queue_type The queue type for the flow (e.g., QUEUE_TYPE_FLOW_TX).
+ * @return The circular queue type.
+ */
+Circular_Queue_Types get_queue_num_by_can_instance(CANInstance can_instance, Queue_Type_Flow queue_type);
 
-void send_reply_to_request(CANDevicePID *pid_config, Parsed_CAN_Data parsed_can_data);
+/* --- CAN Packet Transmission Functions --- */
 
-void log_can_message(uint64_t request_id, uint8_t *TxData, uint8_t dlc);
+/**
+ * @brief Send a CAN packet to the transmission queue.
+ *
+ * @param can_instance The CAN instance (e.g., CAN_TRUCK or CAN_AUX).
+ * @param device Pointer to the CANDeviceConfig structure.
+ * @param pid Pointer to the CANDevicePID structure.
+ * @param verb The CAN verb type (e.g., request or reply).
+ */
+void send_can_packet_to_tx_queue(CANInstance can_instance, CANDeviceConfig *device, CANDevicePID *pid, CAN_Verb_Type verb);
 
+/**
+ * @brief Process and send all CAN requests.
+ */
+void send_all_requests(void);
 
-CAN_HandleTypeDef *get_hcan_from_instance(CANInstance instance);
+/* --- CAN Packet Reception and Processing Functions --- */
 
+/**
+ * @brief Retrieve a message from the CAN FIFO and populate a CAN_Packet.
+ *
+ * @param hcan Pointer to the HAL CAN handle.
+ * @param can_instance The CAN instance.
+ * @param packet Pointer to the CAN_Packet structure to populate.
+ * @return True if successful, false otherwise.
+ */
+bool get_rx_message_from_CAN_RX_FIFO0(CAN_HandleTypeDef *hcan, CANInstance can_instance, CAN_Packet *packet);
+
+/**
+ * @brief Process a received CAN packet.
+ *
+ * @param queue_enum The circular queue type.
+ * @param can_instance_enum The CAN instance enum.
+ * @param packet Pointer to the CAN_Packet.
+ */
+void process_can_rx_packet(Circular_Queue_Types queue_enum, CANInstance can_instance_enum, CAN_Packet *packet);
+
+/* --- CAN Header and Payload Management --- */
+
+/**
+ * @brief Configure a CAN Tx header.
+ *
+ * @param tx_header Pointer to the CAN_TxHeaderTypeDef structure.
+ * @param std_id The standard identifier for the CAN message.
+ */
 void create_can_tx_header(CAN_TxHeaderTypeDef *tx_header, uint32_t std_id);
 
 /**
- * @brief Generate a CAN payload for the specified device and PID.
- *
- * Constructs the CAN payload based on the target device and PID configuration.
+ * @brief Generate a CAN payload for a specific device and PID.
  *
  * @param device Pointer to the CANDeviceConfig structure.
  * @param pid Pointer to the CANDevicePID structure.
@@ -83,156 +134,71 @@ void create_can_tx_header(CAN_TxHeaderTypeDef *tx_header, uint32_t std_id);
  */
 void generate_can_tx_read_data_payload(CANDeviceConfig *device, CANDevicePID *pid, uint8_t *TxData);
 
-/* --- CAN Message Handling Functions --- */
-
-CAN_HandleTypeDef *get_hcan_from_instance(CANInstance instance);
-
-/**
- * @brief Retrieves the CAN instance for the given hardware instance.
- *
- * @param hcan Pointer to the CAN hardware instance (e.g., CAN1 or CAN2).
- * @return CANInstance Enum value representing the CAN instance (e.g., CAN_TRUCK or CAN_AUX).
- *         Returns CAN_TOTAL (invalid) if the instance is unknown.
- */
-CANInstance get_can_instance_enum(CAN_HandleTypeDef *hcan);
-
-/**
- * @brief Processes a received CAN packet.
- *
- * Handles the processing of a single CAN packet, including logging raw data,
- * checking for ignored messages, parsing, validation, and updating states.
- *
- * @param packet Pointer to the CAN_Packet to be processed.
- */
-void process_can_rx_packet(Circular_Queue_Types queue_enum, CANInstance enum_can_instance, CAN_Packet *packet);
-
-/**
- * @brief Retrieve a CAN message and populate a CAN_Packet for the specified CAN instance.
- *
- * This function attempts to retrieve a message from the CAN FIFO0 buffer and stores
- * the data into a CAN_Packet, which can then be queued or processed further.
- *
- * @param hcan Pointer to the CAN hardware handle (e.g., CAN1 or CAN2).
- * @param can_instance The CAN instance (e.g., CAN_TRUCK or CAN_AUX).
- * @param packet Pointer to a CAN_Packet where the retrieved data will be stored.
- * @return true if the message was successfully retrieved, false otherwise.
- */
-bool get_rx_message_from_CAN_RX_FIFO0(CAN_HandleTypeDef *hcan, CANInstance can_instance, CAN_Packet *packet);
-
-/**
- * @brief Parse and process an incoming CAN message.
- *
- * Handles the complete lifecycle of a received CAN message, including logging,
- * validation, and signal updates.
- *
- * @param can_instance The CAN instance (e.g., CAN1 or CAN2) receiving the message.
- */
-void handle_incoming_can_packet(CANInstance can_instance);
-
-/**
- * @brief Parse raw CAN data into a structured format.
- *
- * This function extracts fields such as data length, PID, and payload
- * from a raw 8-byte CAN data array and populates a Parsed_CAN_Data structure.
- * It performs basic validation on the input pointers and reports errors
- * using the user error handler if necessary.
- *
- * @param raw_data Pointer to the raw CAN data array (8 bytes).
- *                 This data represents a single CAN message payload.
- * @param parsed_data Pointer to the Parsed_CAN_Data structure where the
- *                    parsed fields will be stored.
- * @return true if parsing was successful, false if input pointers were invalid.
- */
-bool parse_raw_can_data(const uint8_t *raw_data, Parsed_CAN_Data *parsed_data);
-
-/**
- * @brief Validate the parsed CAN data fields.
- *
- * Ensures the data length and other parsed fields meet expected constraints.
- *
- * @param parsed_data Pointer to the Parsed_CAN_Data structure.
- * @return true if the data is valid, false otherwise.
- */
-bool validate_parsed_can_data(const Parsed_CAN_Data *parsed_data);
-
 /* --- Device and PID Configuration Functions --- */
 
 /**
- * @brief Retrieve a device configuration by CAN ID.
+ * @brief Retrieve a device configuration by its CAN ID.
  *
- * Searches the list of configured devices for a matching CAN ID.
- *
- * @param rx_id The CAN ID to search for.
- * @return Pointer to the matching CANDeviceConfig, or NULL if not found.
+ * @param stdid The CAN ID.
+ * @param flow The packet flow direction.
+ * @return Pointer to the CANDeviceConfig structure, or NULL if not found.
  */
 CANDeviceConfig *get_device_config_by_id(uint32_t stdid, CAN_Packet_Flow flow);
 
 /**
- * @brief Retrieve a PID configuration by PID.
+ * @brief Retrieve a PID configuration from a device by PID.
  *
- * Searches the list of PIDs in a device's configuration for a matching PID.
- *
- * @param device Pointer to the CANDeviceConfig containing the PIDs.
+ * @param device Pointer to the CANDeviceConfig structure.
  * @param pid The PID to search for.
- * @return Pointer to the matching CANDevicePID, or NULL if not found.
+ * @return Pointer to the CANDevicePID structure, or NULL if not found.
  */
 CANDevicePID *get_pid_by_id(CANDeviceConfig *device, uint16_t pid);
-
-/* --- Logging Functions --- */
-
-/**
- * @brief Log the raw incoming CAN message for debugging.
- *
- * Formats and logs the raw CAN ID and data bytes.
- *
- * @param can_instance The CAN instance (e.g., CAN_TRUCK or CAN_AUX).
- */
-void log_raw_can_packet(const CAN_Packet *packet);
-
-/**
- * @brief Log validated CAN data for debugging.
- *
- * Provides a formatted log of the PID and payload.
- *
- * @param parsed_data Pointer to the Parsed_CAN_Data structure.
- */
-void log_valid_can_data(const Parsed_CAN_Data *parsed_data);
-
-/* --- Utility Functions --- */
-
-/**
- * @brief Get the CAN instance corresponding to a hardware handle.
- *
- * Maps a HAL CAN handle (e.g., hcan1) to the appropriate CANInstance.
- *
- * @param hcan Pointer to the HAL CAN handle.
- * @return The CANInstance (e.g., CAN_TRUCK or CAN_AUX).
- */
-CANInstance get_can_instance_from_hcan(CAN_HandleTypeDef *hcan);
-
-void send_can_request_to_tx_queue(CANInstance can_instance, CANDeviceConfig *device, CANDevicePID *pid);
 
 /**
  * @brief Determine if a CAN message should be ignored.
  *
- * Filters out non-critical messages like heartbeats.
+ * Filters out non-critical messages like heartbeats or other irrelevant data.
  *
  * @param can_id The CAN ID of the message.
- * @return true if the message should be ignored, false otherwise.
+ * @return True if the message should be ignored, false otherwise.
  */
-
-/**
- * @brief Send CAN requests for all devices and their PIDs.
- *
- * Iterates through all configured devices and PIDs and sends a CAN request for each.
- * This function is typically used to initialize communication or request status
- * from all known devices on the CAN network.
- */
-void send_all_requests(void);
-
 bool should_ignore_message(uint32_t can_id);
 
-extern CAN_HandleTypeDef *can_handles[];
+/* --- CAN Instance Mapping Functions --- */
+
+/**
+ * @brief Retrieve the CAN handle for the given CAN instance.
+ *
+ * @param instance The CANInstance (e.g., CAN_TRUCK or CAN_AUX).
+ * @return Pointer to the corresponding HAL CAN handle.
+ */
+CAN_HandleTypeDef *get_hcan_from_instance(CANInstance instance);
+
+/**
+ * @brief Retrieve the CAN instance for the given hardware instance.
+ *
+ * @param hcan Pointer to the HAL CAN handle.
+ * @return The CANInstance (e.g., CAN_TRUCK or CAN_AUX).
+ */
+CANInstance get_can_instance_enum(CAN_HandleTypeDef *hcan);
+
+/**
+ * @brief Parses raw CAN data into a structured format.
+ *
+ * @param raw_data Pointer to the raw CAN data (8 bytes).
+ * @param parsed_data Pointer to the parsed data structure.
+ * @return true if parsing succeeds, false otherwise.
+ */
+bool parse_raw_can_data(const uint8_t *raw_data, Parsed_CAN_Data *parsed_data);
+
+/**
+ * @brief Validates parsed CAN data for integrity.
+ *
+ * @param parsed_data Pointer to the parsed data structure.
+ * @return true if the data is valid, false otherwise.
+ */
+bool validate_parsed_can_data(const Parsed_CAN_Data *parsed_data);
+
 
 #ifdef __cplusplus
 }

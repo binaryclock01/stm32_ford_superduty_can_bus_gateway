@@ -278,6 +278,8 @@ int main(void)
 
   // uart logging system
   init_log_system();
+
+  // log the welcome message of program startup
   display_welcome_message();
 
 #ifdef USE_SSD1306
@@ -285,7 +287,9 @@ int main(void)
   init_oled_data(); // zero all string data
 #endif
 
-  // Initialize TRUCK CAN (hcan1)
+  // Initialize and log statuses of the HAL CAN buses
+  start_hal_cas_buses();
+
   if (HAL_CAN_Start(&hcan1) != HAL_OK) {
       user_error_handler(ERROR_CAN_INIT_FAILED, "Failed to start TRUCK CAN");
       return HAL_ERROR;  // Use HAL-defined error code for system failure
