@@ -36,7 +36,7 @@
 #include "rtos.h"
 #include "can_core.h"
 #include "utils.h"
-
+#include "system.h"
 
 
 int _write(int file, char *data, int len) {
@@ -169,8 +169,8 @@ bool configure_can_filter(CAN_HandleTypeDef *hcan, const CAN_FilterTypeDef *filt
 
     // Optional: Log success for debugging
     char log_msg[64];
-    snprintf(log_msg, sizeof(log_msg), "CAN filter applied successfully on CAN instance %p", hcan);
-    send_console_msg(log_msg);
+    snprintf(log_msg, sizeof(log_msg), "* CAN filter applied successfully on CAN instance %p", hcan);
+    log_message(log_msg);
 
     return true;
 }
@@ -220,6 +220,8 @@ int main(void)
 
   /* USER CODE BEGIN 1 */
 
+  init_log_system();
+
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -248,8 +250,11 @@ int main(void)
   /* USER CODE BEGIN 2 */
 
   send_clear_screen_ansi_code();
-  // uart logging system
-  EXECUTE_FUNCTION_AND_FLUSH_LOGS(init_log_system);
+
+  flush_logs(); // now UART is ready, flush logs from init_log_system() above
+  check_heap_usage();
+  //check_heap_usage();
+
   EXECUTE_FUNCTION_AND_FLUSH_LOGS(display_welcome_message);
 
 
@@ -665,14 +670,15 @@ void StartCAN1_Tx_Task(void *argument)
 {
   /* USER CODE BEGIN StartCAN1_Tx_Task */
   /* Infinite loop */
-  osThreadSuspend(osThreadGetId());
+  //osThreadSuspend(osThreadGetId());
 
-//  for(;;)
-//  {
-//	CAN_Packet *packet = NULL;
-//	if (osMessageQueueGet(can_circular_buffer[QUEUE_TX_CAN1].queue_handle, &packet, NULL, osWaitForever) == osOK)
-//		__rtos__StartCAN_Tx_Task(CAN_TRUCK, packet);
-//  }
+  for(;;)
+  {
+     CAN_Packet *packet = NULL;
+     if (osMessageQueueGet(can_circular_buffer[QUEUE_TX_CAN1].queue_handle, &packet, NULL, osWaitForever) == osOK)
+    	 __rtos__StartCAN_Tx_Task(CAN_TRUCK, packet);
+     osDelay(5);
+  }
   /* USER CODE END StartCAN1_Tx_Task */
 }
 
@@ -691,7 +697,7 @@ void StartHousekeeping_Task(void *argument)
   /* USER CODE BEGIN StartHousekeeping_Task */
   for (;;) {
 	__rtos__log_task();
-	//osDelay(1000);
+	osDelay(100);
 	// Yield to other threads without a fixed delay
 	//osThreadYield();
 	  //osThreadSuspend(osThreadGetId());
@@ -718,7 +724,7 @@ void StartCAN_Tx_Send_Requests(void *argument)
 	{
 	  uint32_t queue_length = osMessageQueueGetCount(can_circular_buffer[QUEUE_TX_CAN1].queue_handle);
 	  char msg[255];
-	  if (queue_length > 3)
+	  if (queue_length >= 7)
 	  {
 		  sprintf(msg, "Cannot send Tx requests - Tx_QueueHandle has %lu elements and it would overflow the buffer.\r\n", queue_length);
 		  printf(msg);
@@ -732,7 +738,7 @@ void StartCAN_Tx_Send_Requests(void *argument)
 	  }
 
       osThreadYield();
-      osDelay(ms_to_ticks(1000));
+      osDelay(2000);
 	}
       //osThreadYield();
   /* USER CODE END StartCAN_Tx_Send_Requests */

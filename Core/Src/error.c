@@ -77,6 +77,10 @@ ErrorEntry error_table[] = {
     // New CAN Context Errors (500-599)
     {ERROR_CAN_QUEUE_UNAVAILABLE,   "Queue unavailable for CAN instance",  ERROR_CATEGORY_CAN,     ERROR_SEVERITY_WARNING,    0},
     {ERROR_CAN_INVALID_CONTEXT,     "Invalid CAN context in callback",     ERROR_CATEGORY_CAN,     ERROR_SEVERITY_CRITICAL,   0},
+
+	// Heap creation errors (600-699)
+	{ERROR_HEAP_CREATE_LOG_BUFFER,  "Failed to allocate log buffer in heap",ERROR_CATEGORY_HEAP,   ERROR_SEVERITY_CRITICAL,   0},
+	{ERROR_HEAP_LOG_BUFFER_NULL,    "Global log buffer pointer is NULL",    ERROR_CATEGORY_HEAP,   ERROR_SEVERITY_CRITICAL,   0},
 };
 
 

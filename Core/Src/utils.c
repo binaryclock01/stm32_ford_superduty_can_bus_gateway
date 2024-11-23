@@ -57,6 +57,7 @@ uint16_t bytes_to_uint16(uint8_t high_byte, uint8_t low_byte) {
     return ((uint16_t)high_byte << 8) | (uint16_t)low_byte;
 }
 
+
 int tobinary(uint32_t i)
 {
 	if (i > 0)

@@ -23,6 +23,7 @@ typedef enum {
     ERROR_CATEGORY_RTOS,
     ERROR_CATEGORY_UI,
     ERROR_CATEGORY_STORAGE,
+	ERROR_CATEGORY_HEAP,
 } ErrorCategory;
 
 /**
@@ -81,7 +82,12 @@ typedef enum {
 
     // New CAN Context Errors (500-599)
     ERROR_CAN_QUEUE_UNAVAILABLE = 500,
-    ERROR_CAN_INVALID_CONTEXT
+    ERROR_CAN_INVALID_CONTEXT,
+
+	// Heap creation errors (600-699)
+	ERROR_HEAP_CREATE_LOG_BUFFER,
+	ERROR_HEAP_LOG_BUFFER_NULL,
+
 } ErrorCodes;
 
 

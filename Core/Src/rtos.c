@@ -303,6 +303,7 @@ void __rtos__StartCAN_Tx_Task(CANInstance enum_can_instance, CAN_Packet *packet)
 		return;
 	}
 	__rtos_send_tx_packet_to_can_interface(packet);
+	_free_can_packet_using_queue_type_from_circular_buffer(queue_enum);
 }
 
 /**
@@ -322,14 +323,6 @@ bool __rtos_send_tx_packet_to_can_interface(CAN_Packet *packet) {
     // Delegate to CAN-specific function in can_core.c
     bool result = _send_tx_packet_to_can_interface(packet);
 
-/*
-    // Log the result
-    if (result) {
-        log_status_message("|| RTOS CAN Tx", true);
-    } else {
-        log_status_message("|| Tx Queue ", false);
-    }
-*/
     return result;
 }
 

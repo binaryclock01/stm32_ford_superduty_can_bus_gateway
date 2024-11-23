@@ -21,8 +21,8 @@
    Constants and Macros
    -------------------------------------------------------------------------- */
 
-#define LOG_BUFFER_SIZE 100    /**< Maximum number of messages in the log buffer */
-#define LOG_MESSAGE_MAX_LENGTH 128    /**< Maximum length of each log message */
+#define LOG_BUFFER_SIZE 16   /**< Maximum number of messages in the log buffer */
+#define LOG_MESSAGE_MAX_LENGTH 256   /**< Maximum length of each log message */
 
 
 // execute a function and flush the logs
@@ -43,7 +43,7 @@
  * @brief Circular buffer structure for log messages.
  */
 typedef struct {
-    char messages[LOG_BUFFER_SIZE][LOG_MESSAGE_MAX_LENGTH]; /**< Log messages */
+    char (*messages)[LOG_MESSAGE_MAX_LENGTH]; /**< Pointer to log messages array */
     uint16_t head;        /**< Write position in the buffer */
     uint16_t tail;        /**< Read position in the buffer */
     uint16_t count;       /**< Number of messages in the buffer */
@@ -54,13 +54,18 @@ typedef struct {
    Extern Variables
    -------------------------------------------------------------------------- */
 
-extern LogBuffer log_buffer;
-
 /* --------------------------------------------------------------------------
    Function Declarations
    -------------------------------------------------------------------------- */
 
 /* --- Initialization and Setup --- */
+
+void report_log_buffer_heap_size(void);
+void report_log_buffer_fullness(void);
+
+LogBuffer *get_log_buffer_global_ptr(void);
+bool create_log_buffer__heap__(void);
+void destroy_log_buffer__heap__(void);
 
 void log_queue_packet_counts(void);
 void log_circular_buffer_usage(void);
