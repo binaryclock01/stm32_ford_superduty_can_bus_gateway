@@ -190,7 +190,8 @@ CANDevicePID *get_pid_by_id(CANDeviceConfig *device, uint16_t pid);
  */
 bool should_ignore_message(uint32_t can_id);
 
-bool is_signal_on(const CANSignal *signal, uint32_t payload);
+bool is_signal_on(const CANSignal *signal);
+bool does_payload_turn_signal_on(const CANSignal *signal, uint32_t payload);
 
 /* --- CAN Instance Mapping Functions --- */
 

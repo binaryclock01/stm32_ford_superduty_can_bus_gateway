@@ -39,6 +39,9 @@
 #include "utils.h"
 #include "system.h"
 
+#ifdef IS_SIMULATOR
+#include "sim.h"
+#endif // IS_SIMULATOR
 
 int _write(int file, char *data, int len) {
     // Use HAL_UART_Transmit to send data to UART2
@@ -258,6 +261,9 @@ int main(void)
 
   EXECUTE_FUNCTION_AND_FLUSH_LOGS(display_welcome_message);
 
+#ifdef IS_SIMULATOR
+  __sim__initialize_states_mapping_array();
+#endif // IS_SIMULATOR
 
 #ifdef USE_SSD1306
   ssd1306_Init(); // init OLED screen

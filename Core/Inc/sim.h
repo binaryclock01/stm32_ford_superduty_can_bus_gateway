@@ -32,16 +32,17 @@ typedef struct {
 	uint8_t turn_right_change_state;
 } _SIM_Turn_Signal_States;
 
+
+extern _SIM_Signal_States __sim__g_signal_states;
+extern _SIM_Turn_Signal_States __sim__g_turn_signal_states;
+
 // maps each simulated state above to the global variable
 // this is used in void multiplex_turn_signal_states()
-const uint8_t __sim__g_states_mapping_array[] = {
-	__sim__g_signal_states->button_turn_left_state,
-	__sim__g_signal_states->button_right_left_state,
-	__sim__g_signal_states->button_turn_left_change_state,
-	__sim__g_signal_states->button_turn_right_change_state
-};
+#define TURN_SIGNAL_COUNT 4
 
-void __sim__generate_packet_response_from_truck(CANDevicePID *device_pid);
+
+void __sim__generate_packet_response_from_truck(CANDevicePID *device_pid, CAN_Command command);
+void __sim__initialize_states_mapping_array();
 
 #endif /* INC_SIM_H_ */
 

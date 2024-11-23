@@ -9,13 +9,21 @@
 #include "device_configs.h"
 #include "config.h"
 
+// Define an array of masks
+const uint64_t _g_turn_signal_bitmask_mapping_array[] = {
+    TURN_SIGNAL_LEFT_BIT_MASK,
+    TURN_SIGNAL_RIGHT_BIT_MASK,
+    TURN_SIGNAL_LEFT_CHANGE_BIT_MASK,
+    TURN_SIGNAL_RIGHT_CHANGE_BIT_MASK
+};
+
 // BCM Configurations Array
 CANDevicePID bcm_pids[] = {
     {
         .name = "Hazard Button", .short_name = "Hzd",
         .pid_id = {0x71, 0x50},
 		.num_of_signals = 1,
-		.state_generation = CAN_STATE_GENERATION_NON_MULTIPLEXED_BYTE,
+		.state_generation_type = CAN_STATE_GENERATION_NON_MULTIPLEXED_BYTE,
         .signals = {
             { .name = "Hazard Button", .short_name = "Hzd",
               .change_type = STATE_BIT, .data = 0,
@@ -28,7 +36,7 @@ CANDevicePID bcm_pids[] = {
         .name = "Brake Pedal", .short_name = "Brk",
         .pid_id = {0x2B, 0x00},
 		.num_of_signals = 1,
-		.state_generation = CAN_STATE_GENERATION_NON_MULTIPLEXED_BYTE,
+		.state_generation_type = CAN_STATE_GENERATION_NON_MULTIPLEXED_BYTE,
 		.signals = {
             { .name = "Brake Pedal", .short_name = "Brk",
               .change_type = STATE_BIT, .data = 0,
@@ -41,7 +49,7 @@ CANDevicePID bcm_pids[] = {
         .name = "Reverse Light", .short_name = "Rev",
         .pid_id = {0x40, 0xC8},
 		.num_of_signals = 1,
-		.state_generation = CAN_STATE_GENERATION_NON_MULTIPLEXED_BYTE,
+		.state_generation_type = CAN_STATE_GENERATION_NON_MULTIPLEXED_BYTE,
         .signals = {
             { .name = "Reverse Light", .short_name = "Rev",
               .change_type = STATE_BIT, .data = 0,
@@ -58,7 +66,7 @@ CANDevicePID sccm_pids[] = {
         .name = "Turn Signals", .short_name = "TS",
         .pid_id = {0x71, 0x50},
 		.num_of_signals = 4,
-		.state_generation = CAN_STATE_GENERATION_MULTIPLEXED_BYTE,
+		.state_generation_type = CAN_STATE_GENERATION_MULTIPLEXED_BYTE,
         .signals = {
             { .name = "Left Turn Signal", .short_name = "LT",
               .change_type = STATE_BIT, .data = 0,

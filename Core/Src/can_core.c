@@ -179,7 +179,7 @@ uint64_t build_can_tx_read_data_request(CANDeviceConfig *device, CANDevicePID *p
     uint8_t request_size_in_bytes = 0x03;
 
     // Command byte (e.g., Read command 0x22)
-    uint8_t command_byte = can_request_commands[CMD_READ].byte;
+    uint8_t command_byte = can_request_commands[REQ_READ].byte;
 
     // PID in big-endian format
     uint16_t pid_id = __builtin_bswap16(*(uint16_t *)pid->pid_id);
@@ -479,7 +479,7 @@ void process_signal_changes(CANDevicePID *device_pid, uint32_t payload) {
 
         switch (signal->change_type) {
             case STATE_BIT:
-            	signal->data = (is_signal_on(signal, payload) ? 1 : 0);
+            	signal->data = (does_payload_turn_signal_on(signal, payload) ? 1 : 0);
                 break;
             case STATE_BYTE:
                 // TODO: Implement STATE_BYTE condition
@@ -813,7 +813,7 @@ void process_can_rx_packet(Circular_Queue_Types queue_enum, CANInstance can_inst
 // if this a simulator (aka, simulating the truck's responses)
 #ifdef IS_SIMULATOR
     		// then generate a new packet to respond to the received packet
-    		__sim__generate_packet_response_from_truck(pid_config, parsed_data->command);
+    		__sim__generate_packet_response_from_truck(pid_config, parsed_data.command);
 #elif
     		// if this is not a simulator, then process the signal change
     	    process_signal_changes(pid_config, parsed_data.payload);

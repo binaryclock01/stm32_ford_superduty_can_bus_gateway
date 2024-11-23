@@ -11,34 +11,41 @@
 #include "config.h"
 #include "device_configs.h"
 #include "can_core.h"
+#include "log.h"
 
 #ifdef IS_SIMULATOR
 
-_SIM_Signal_States __sim__g_signal_states;
-_SIM_Turn_Signal_States __sim__g_turn_signal_states;
-
-_SIM_Turn_Signal_States __sim__turn_signal_states = {
+_SIM_Turn_Signal_States __sim__g_turn_signal_states = {
     .turn_left_state = 1,  // Example: Left turn active
     .right_left_state = 0,
     .turn_left_change_state = 1,  // Example: Lane change active
     .turn_right_change_state = 0
 };
 
-_SIM_Signal_States __sim__signal_states = {
+_SIM_Signal_States __sim__g_signal_states = {
     .hazard_button = false,
     .reverse_lamp = false,
     .brake_pedal = false,
     .turn_signal_multiplexed_byte = 0
 };
 
-void multiplex_turn_signal_states(_SIM_Turn_Signal_States *turn_states, _SIM_Signal_States *signal_states) {
+uint8_t __sim__g_states_mapping_array[TURN_SIGNAL_COUNT]; // non-constant array
+
+void __sim__initialize_states_mapping_array() {
+    __sim__g_states_mapping_array[0] = __sim__g_turn_signal_states.turn_left_state;
+    __sim__g_states_mapping_array[1] = __sim__g_turn_signal_states.right_left_state;
+    __sim__g_states_mapping_array[2] = __sim__g_turn_signal_states.turn_left_change_state;
+    __sim__g_states_mapping_array[3] = __sim__g_turn_signal_states.turn_right_change_state;
+}
+
+uint8_t multiplex_turn_signal_states(_SIM_Turn_Signal_States *turn_signal_states, _SIM_Signal_States *signal_states) {
 	// assign the mapping arrays
 	const uint64_t *turn_signal_bitmask_mapping_array = _g_turn_signal_bitmask_mapping_array;
 	const uint8_t *states_mapping_array = __sim__g_states_mapping_array;
 
 
     if (turn_signal_states == NULL || signal_states == NULL) {
-        return; // Ensure valid pointers
+        return 0; // Ensure valid pointers
     }
 
     // Start with a zeroed multiplexed byte
@@ -76,7 +83,7 @@ void __sim__generate_packet_response_from_truck(CANDevicePID *device_pid, CAN_Co
                     if (device_pid->num_of_signals == 1) {
                         // Check the single signal's state
                         bool is_state_on = is_signal_on(&device_pid->signals[0]);
-                        printf("State is %s\n", is_state_on ? "ON" : "OFF");
+                        log_message("State is %s\n", is_state_on ? "ON" : "OFF");
                     }
                     break;
 
@@ -119,22 +126,22 @@ void __sim__generate_packet_response_from_truck(CANDevicePID *device_pid, CAN_Co
                          */
                         if (masked_data == signal_on_masked) {
                             // Signal is "on": Set the corresponding bit in the multiplexed byte
-                            multiplexed_byte |= (1 << Turn_Signal_Bitmasks[i]);
+                            multiplexed_byte |= ~bitmask;
                         }
                     }
 
                     // Output the computed multiplexed byte
-                    printf("Multiplexed Byte: 0x%02X\n", multiplexed_byte);
+                    log_message("Multiplexed Byte: 0x%02X\n", multiplexed_byte);
                 } break;
 
                 default:
-                    printf("Unknown state generation type.\n");
+                    log_message("Unknown state generation type.\n");
                     break;
             }
             break;
 
         default:
-            printf("Unknown CAN command.\n");
+            log_message("Unknown CAN command.\n");
             break;
     }
 }

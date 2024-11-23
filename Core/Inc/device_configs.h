@@ -60,19 +60,13 @@ typedef enum {
 
 typedef enum {
 											// mask       // when inverted
-	TURN_SIGNAL_LEFT_BIT_MASK			=	0xFE00000000, // 0x01, 0x00, 0x00, 0x00
-	TURN_SIGNAL_RIGHT_BIT_MASK 			=	0XFD00000000, // 0x02, 0x00, 0x00, 0x00
-	TURN_SIGNAL_LEFT_CHANGE_BIT_MASK 	=	0x00FD000000, // 0x00, 0x02, 0x00, 0x00
-	TURN_SIGNAL_RIGHT_CHANGE_BIT_MASK	=	0x00FB000000, // 0x00, 0x04, 0x00, 0x00
+	TURN_SIGNAL_LEFT_BIT_MASK			=	0xFEFFFFFFFF, // 0x01, 0x00, 0x00, 0x00
+	TURN_SIGNAL_RIGHT_BIT_MASK 			=	0XFDFFFFFFFF, // 0x02, 0x00, 0x00, 0x00
+	TURN_SIGNAL_LEFT_CHANGE_BIT_MASK 	=	0xFFFDFFFFFF, // 0x00, 0x02, 0x00, 0x00
+	TURN_SIGNAL_RIGHT_CHANGE_BIT_MASK	=	0xFFFBFFFFFF, // 0x00, 0x04, 0x00, 0x00
 } Turn_Signal_Bitmasks;
 
-// Define an array of masks
-extern const uint64_t _g_turn_signal_bitmask_mapping_array[] = {
-    TURN_SIGNAL_LEFT_BIT_MASK,
-    TURN_SIGNAL_RIGHT_BIT_MASK,
-    TURN_SIGNAL_LEFT_CHANGE_BIT_MASK,
-    TURN_SIGNAL_RIGHT_CHANGE_BIT_MASK
-};
+extern const uint64_t _g_turn_signal_bitmask_mapping_array[];
 
 typedef enum {
     RELEVANT_1_BYTE = 0xFF000000,  // Mask for 1 relevant byte (MSB)
