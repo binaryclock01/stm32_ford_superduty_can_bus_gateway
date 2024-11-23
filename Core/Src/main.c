@@ -630,7 +630,7 @@ void StartCAN1_Rx_Task(void *argument)
   for (;;) {
 		if (osMessageQueueGet(can_circular_buffer[QUEUE_RX_CAN1].queue_handle, &packet, NULL, osWaitForever) == osOK)
 			__rtos__StartCAN_Rx_Task(CAN_TRUCK, packet);
-		osDelay(1000);
+		osDelay(1);
   }
   /* USER CODE END 5 */
 }
@@ -694,6 +694,7 @@ void StartCAN1_Tx_Task(void *argument)
 /* USER CODE END Header_StartHousekeeping_Task */
 void StartHousekeeping_Task(void *argument)
 {
+  osThreadYield();
   /* USER CODE BEGIN StartHousekeeping_Task */
   for (;;) {
 	__rtos__log_task();
@@ -738,7 +739,7 @@ void StartCAN_Tx_Send_Requests(void *argument)
 	  }
 
       osThreadYield();
-      osDelay(2000);
+      osDelay(15000);
 	}
       //osThreadYield();
   /* USER CODE END StartCAN_Tx_Send_Requests */
