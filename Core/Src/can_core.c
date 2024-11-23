@@ -18,17 +18,18 @@
 #include <cmsis_os.h>        // RTOS CMSIS types, such as osMutedId_t
 
 #include "can_core.h"
+#include "config.h"
 #include "main.h"            // For HAL_CAN and other core includes
 #include "device_configs.h"  // Include configurations for CAN devices
 #include "ssd1306.h"         // For OLED display functions
 #include "ui.h"              // For console message utilities
 #include "utils.h"           // For helper functions like bytes_to_uint32
 #include "error.h"           // For error handling utilities
-
 #include "rtos.h"
 #include "can_core.h"
 #include "ansi.h"
 #include "log.h"
+#include "sim.h"
 
 /* -----------------------------------------------------------------------------
    Function Definitions
@@ -236,7 +237,7 @@ void generate_can_tx_read_data_payload(CANDeviceConfig *device, CANDevicePID *pi
 uint32_t get_can_device_stdid(CANDeviceConfig *device, CAN_Verb_Type verb)
 {
 	if (verb == CAN_VERB_REPLY)
-		return device->id.reply;
+		return device->id.response;
 	else if (verb == CAN_VERB_REQUEST)
 		return device->id.request;
 	return 0;
@@ -397,11 +398,11 @@ void send_all_requests(void) {
  * @param rx_id The CAN ID to search for.
  * @return CANDeviceConfig* Pointer to the matching device configuration, or NULL if not found.
  */
-CANDeviceConfig *get_device_config_by_id(uint32_t stdid, CAN_Packet_Flow flow) {
+CANDeviceConfig *get_device_config_by_id(uint32_t stdid) {
     for (uint8_t module_idx = 0; module_idx < CAN_DEVICE_COUNT; module_idx++) {
         CANDeviceConfig *module_config = &can_devices[module_idx];
-        if ( ( (flow == PACKET_RX) && module_config->id.reply ) ||
-        	 ( (flow == PACKET_TX) && module_config->id.request ) )
+        if ( (module_config->id.response == stdid ) ||
+        	 (module_config->id.request == stdid) )
             return module_config;
     }
     return NULL;
@@ -434,7 +435,24 @@ CANDevicePID *get_pid_by_id(CANDeviceConfig *module, uint16_t pid) {
     return NULL;
 }
 
-bool is_signal_on(const CANSignal *signal, uint32_t payload) {
+bool is_signal_on(const CANSignal *signal) {
+    // Validate input
+    if (signal == NULL) {
+        return false; // Signal is invalid
+    }
+
+    // Get the relevant mask based on relevant_data_bytes
+    uint32_t mask = get_relevant_mask(signal->relevant_data_bytes);
+
+    // Apply the mask to both the signal data and the state_on mask
+    uint32_t masked_data = signal->data & mask;
+    uint32_t masked_state_on = *((uint32_t *)signal->state_on) & mask;
+
+    // Check if the masked data matches the masked state_on
+    return masked_data == masked_state_on;
+}
+
+bool does_payload_turn_signal_on(const CANSignal *signal, uint32_t payload) {
     uint32_t mask = get_relevant_mask(signal->relevant_data_bytes);
 
     // Mask both the payload and the state_on signal
@@ -444,6 +462,8 @@ bool is_signal_on(const CANSignal *signal, uint32_t payload) {
     // Compare masked values
     return (masked_payload == masked_state_on);
 }
+
+
 /**
  * @brief Process signal changes for a given PID and payload.
  *
@@ -472,6 +492,8 @@ void process_signal_changes(CANDevicePID *device_pid, uint32_t payload) {
         }
     }
 }
+
+
 
 /**
  * @brief Translates a HAL CAN Rx header into the unified CAN_Header format.
@@ -610,6 +632,7 @@ bool parse_raw_can_data(const uint8_t *raw_data, Parsed_CAN_Data *parsed_data) {
     // Extract the data length (highest byte)
     parsed_data->data_length = (raw_combined >> 56) & 0xFF;
 
+    parsed_data->command = (raw_combined >> 48) & 0xFF;
     // Extract the PID (next 2 bytes)
     parsed_data->pid = (uint16_t)((raw_combined >> 32) & 0xFFFF);
 
@@ -763,23 +786,7 @@ void process_can_rx_packet(Circular_Queue_Types queue_enum, CANInstance can_inst
 
     log_valid_can_data(&parsed_data);
 
-    // This is a bit confusing... so listen up
-    // get_device_config_id_by returns either the request or reply StdId.
-    // When receiving a reply from CAN_TRUCK, then
-    //      the id.reply StdId for the device is used (since the truck is replying to a read request)
-    // When receiving a reply from CAN_AUX, then
-    //      the id.request StdId for the device is used (since the aux is listening for a read request)
-
-    // We're using the PACKET flow to have get_device_config_by_id look for either the reply or request StdId
-    // even though we're dealing with the RX queue.
-    CAN_Packet_Flow flow = PACKET_RX;
-
-    // reverse the flow variable sent to get_device_config_by_id
-    // this will make get_device_config_by_id search for the request StdId instead of the reply StdId
-    if (can_instance_enum == CAN_TRUCK)
-    	flow = PACKET_TX;
-
-    CANDeviceConfig *device_config = get_device_config_by_id(packet->header.id, flow);
+    CANDeviceConfig *device_config = get_device_config_by_id(packet->header.id);
 
     if (device_config == NULL) {
         char error_msg[64];
@@ -802,7 +809,15 @@ void process_can_rx_packet(Circular_Queue_Types queue_enum, CANInstance can_inst
     {
     	case CAN_TRUCK:
     	    // Step 8: Update the signal states based on the parsed data
+
+// if this a simulator (aka, simulating the truck's responses)
+#ifdef IS_SIMULATOR
+    		// then generate a new packet to respond to the received packet
+    		__sim__generate_packet_response_from_truck(pid_config, parsed_data->command);
+#elif
+    		// if this is not a simulator, then process the signal change
     	    process_signal_changes(pid_config, parsed_data.payload);
+#endif
     		break;
     	case CAN_AUX:
     		CANInstance reply_enum = CAN_TRUCK;

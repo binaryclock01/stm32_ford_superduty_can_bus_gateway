@@ -8,6 +8,7 @@ extern "C" {
 #include <stdint.h>
 #include <stdbool.h>
 #include "error.h"
+#include "config.h"
 
 /* -----------------------------------------------------------------------------
    Enumerations for Error Handling

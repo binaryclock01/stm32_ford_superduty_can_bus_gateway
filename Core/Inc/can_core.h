@@ -18,6 +18,8 @@ extern "C" {
 
 #include <stdint.h>             // Fixed-width integer types
 #include <stdbool.h>            // Boolean support
+
+#include "config.h"
 #include "device_configs.h"     // CANDeviceConfig, CANDevicePID, etc.
 #include "can_common.h"         // Common CAN utilities
 #include "rtos.h"               // RTOS utilities
@@ -167,7 +169,7 @@ void generate_can_tx_read_data_payload(CANDeviceConfig *device, CANDevicePID *pi
  * @param flow The packet flow direction.
  * @return Pointer to the CANDeviceConfig structure, or NULL if not found.
  */
-CANDeviceConfig *get_device_config_by_id(uint32_t stdid, CAN_Packet_Flow flow);
+CANDeviceConfig *get_device_config_by_id(uint32_t stdid);
 
 /**
  * @brief Retrieve a PID configuration from a device by PID.
@@ -187,6 +189,8 @@ CANDevicePID *get_pid_by_id(CANDeviceConfig *device, uint16_t pid);
  * @return True if the message should be ignored, false otherwise.
  */
 bool should_ignore_message(uint32_t can_id);
+
+bool is_signal_on(const CANSignal *signal, uint32_t payload);
 
 /* --- CAN Instance Mapping Functions --- */
 

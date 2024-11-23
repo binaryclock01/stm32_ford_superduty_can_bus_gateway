@@ -23,6 +23,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 
+#include "config.h"
 #include <device_configs.h>	// Include the configurations for devices
 #include <string.h>  // For memcpy
 #include <stdio.h> // for printf

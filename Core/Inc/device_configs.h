@@ -10,6 +10,8 @@
 
 #include <stdint.h>   // For uint8_t, uint32_t types
 #include <stdbool.h>  // For boolean support
+
+#include "config.h"
 #include "can_common.h"
 
 /* -----------------------------------------------------------------------------
@@ -36,7 +38,7 @@ typedef enum {
 
 typedef struct {
 	uint32_t request;
-	uint32_t reply;
+	uint32_t response;
 } CAN_StdId_Type;
 
 typedef enum {
@@ -57,6 +59,22 @@ typedef enum {
 } CANMasks;
 
 typedef enum {
+											// mask       // when inverted
+	TURN_SIGNAL_LEFT_BIT_MASK			=	0xFE00000000, // 0x01, 0x00, 0x00, 0x00
+	TURN_SIGNAL_RIGHT_BIT_MASK 			=	0XFD00000000, // 0x02, 0x00, 0x00, 0x00
+	TURN_SIGNAL_LEFT_CHANGE_BIT_MASK 	=	0x00FD000000, // 0x00, 0x02, 0x00, 0x00
+	TURN_SIGNAL_RIGHT_CHANGE_BIT_MASK	=	0x00FB000000, // 0x00, 0x04, 0x00, 0x00
+} Turn_Signal_Bitmasks;
+
+// Define an array of masks
+extern const uint64_t _g_turn_signal_bitmask_mapping_array[] = {
+    TURN_SIGNAL_LEFT_BIT_MASK,
+    TURN_SIGNAL_RIGHT_BIT_MASK,
+    TURN_SIGNAL_LEFT_CHANGE_BIT_MASK,
+    TURN_SIGNAL_RIGHT_CHANGE_BIT_MASK
+};
+
+typedef enum {
     RELEVANT_1_BYTE = 0xFF000000,  // Mask for 1 relevant byte (MSB)
     RELEVANT_2_BYTE = 0xFFFF0000, // Mask for 2 relevant bytes (MSB + next byte)
     RELEVANT_3_BYTE = 0xFFFFFF00, // Mask for 3 relevant bytes
@@ -66,12 +84,19 @@ typedef enum {
 /* -----------------------------------------------------------------------------
    CAN Message Bit Indexes
    -------------------------------------------------------------------------- */
+
+#define DATA_LENGTH_BYTE_LENGTH		1
+#define DATA_COMMAND_BYTE_LENGTH	1
+#define DATA_PID_BYTE_LENGTH		2
+#define DATA_SIGNAL_BYTE_LENGTH		4
+
 typedef enum {
-    DATA_LENGTH_START = 0,
-    DATA_COMMAND_START = 1,
-    DATA_PID_START = 2,
-    DATA_PAYLOAD_START = 4
+    DATA_LENGTH_START = 0,  // DATA_LENGTH_BYTE_LENGTH bytes long, starts at byte 0, 1 byte long
+    DATA_COMMAND_START = 1,	// DATA_COMMAND_BYTE_LENGTH bytes long, starts at byte 1, 1 byte long
+    DATA_PID_START = 2,		// DATA_PID_BYTE_LENGTH bytes longs, starts at byte 2, 2 bytes long
+    DATA_PAYLOAD_START = 4  // DATA_SIGNAL_BYTE_LENGTH bytes long, starts at byte 4, 4 bytes long
 } CANMessageBitIndexes;
+
 
 /* -----------------------------------------------------------------------------
    CAN State Change Types
@@ -95,12 +120,20 @@ typedef struct {
     uint32_t data;                        // Current signal state or data
 } CANSignal;
 
+typedef enum {
+	CAN_STATE_GENERATION_NON_MULTIPLEXED_BYTE,
+	CAN_STATE_GENERATION_MULTIPLEXED_BYTE,
+	CAN_STATE_GENERATION_CUSTOM_FUNCTION,
+} CAN_State_Generation_Types;
+
 typedef struct {
     const char *name;                     // Name of the PID
     const char *short_name;               // Short name for display
     uint8_t pid_id[PID_BYTE_LENGTH];       // PID byte data
     uint8_t num_of_signals;					// number of signals used in PID
     CANSignal signals[MAX_SIGNALS_PER_PID]; // Signals associated with this PID
+    CAN_State_Generation_Types state_generation_type;
+    void (*generate_output)(uint8_t *output, void *context); // Function pointer to generate 4-byte output
 } CANDevicePID;
 
 typedef struct {
@@ -154,22 +187,21 @@ typedef struct {
 } CANCommands;
 
 typedef enum {
-    CMD_DIAG,       // Index 0: Diagnostic Session Control
-    CMD_RESET,      // Index 1: ECU Reset
-    CMD_CLEAR,      // Index 2: Clear Diagnostic Information
-    CMD_DTC,        // Index 3: Read DTC Information
-    CMD_READ,       // Index 4: Read Data by Identifier
-    CMD_SEC_ACC,    // Index 5: Security Access
-    CMD_COMM_CTRL,  // Index 6: Communication Control
-    CMD_WRITE,      // Index 7: Write Data by Identifier
-    CMD_ROUTINE,    // Index 8: Routine Control
-    CMD_DOWNLOAD,   // Index 9: Request Download
-    CMD_UPLOAD,     // Index 10: Request Upload
-    CMD_TRANSFER,   // Index 11: Transfer Data
-    CMD_EXIT_TRANS, // Index 12: Request Transfer Exit
-    CMD_TESTER,     // Index 13: Tester Present
-    CMD_NEG_RESP    // Index 14: Negative Response
-} CANCommandIndex;
+    REQ_DIAG_SESS,       // 0x10
+    REQ_ECU_RESET,       // 0x11
+    REQ_CLR_DIAG,        // 0x14
+    REQ_DTC,             // 0x19
+    REQ_READ,            // 0x22
+    REQ_SEC_ACC,         // 0x27
+    REQ_COMM_CTRL,       // 0x28
+    REQ_WRITE,           // 0x2E
+    REQ_ROUTINE,         // 0x31
+    REQ_DOWNLOAD,        // 0x34
+    REQ_UPLOAD,          // 0x35
+    REQ_XFER_DATA,       // 0x36
+    REQ_XFER_EXIT,       // 0x37
+    REQ_TESTER           // 0x3E
+} CAN_Request_Command_Index;
 
 typedef enum {
     RESP_DIAG_SESS,       // 0x50
@@ -186,7 +218,7 @@ typedef enum {
     RESP_XFER_EXIT,       // 0x77
     RESP_TESTER,          // 0x7E
     RESP_NEG              // 0x7F
-} CANReplyCommandIndex;
+} CAN_Reply_Command_Index;
 
 // device_configs.h
 #define CAN_DEVICE_COUNT 2  // Number of devices in the array
@@ -198,6 +230,9 @@ extern CANCommands can_reply_commands[];   // Array of CAN reply commands
    Device Configuration Array
    -------------------------------------------------------------------------- */
 extern CANDeviceConfig can_devices[];  // Array of all CAN device configurations
+
+CANCommands *get_can_request_command(uint8_t can_cmd_byte);
+CANCommands *get_can_response_command(uint8_t can_cmd_byte);
 
 static inline uint32_t get_relevant_mask(uint8_t relevant_data_bytes) {
     static const RelevantByteMask masks[] = {

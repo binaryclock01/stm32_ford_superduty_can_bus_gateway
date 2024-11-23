@@ -11,12 +11,14 @@
 #include <stdio.h>
 
 #include "main.h"  // For CAN handles and HAL functions
+#include "config.h"
 #include "rtos.h"
 #include "can_core.h"
 #include "error.h" // For error handling
 #include "ui.h"
 #include "log.h"
 #include "ansi.h"
+#include "config.h"
 
 // Mutex for protecting the CAN packet pool
 

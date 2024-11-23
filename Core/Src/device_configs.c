@@ -5,8 +5,9 @@
  * Author: Ryan
  */
 
+#include <stddef.h>
 #include "device_configs.h"
-
+#include "config.h"
 
 // BCM Configurations Array
 CANDevicePID bcm_pids[] = {
@@ -14,6 +15,7 @@ CANDevicePID bcm_pids[] = {
         .name = "Hazard Button", .short_name = "Hzd",
         .pid_id = {0x71, 0x50},
 		.num_of_signals = 1,
+		.state_generation = CAN_STATE_GENERATION_NON_MULTIPLEXED_BYTE,
         .signals = {
             { .name = "Hazard Button", .short_name = "Hzd",
               .change_type = STATE_BIT, .data = 0,
@@ -26,6 +28,7 @@ CANDevicePID bcm_pids[] = {
         .name = "Brake Pedal", .short_name = "Brk",
         .pid_id = {0x2B, 0x00},
 		.num_of_signals = 1,
+		.state_generation = CAN_STATE_GENERATION_NON_MULTIPLEXED_BYTE,
 		.signals = {
             { .name = "Brake Pedal", .short_name = "Brk",
               .change_type = STATE_BIT, .data = 0,
@@ -38,6 +41,7 @@ CANDevicePID bcm_pids[] = {
         .name = "Reverse Light", .short_name = "Rev",
         .pid_id = {0x40, 0xC8},
 		.num_of_signals = 1,
+		.state_generation = CAN_STATE_GENERATION_NON_MULTIPLEXED_BYTE,
         .signals = {
             { .name = "Reverse Light", .short_name = "Rev",
               .change_type = STATE_BIT, .data = 0,
@@ -54,6 +58,7 @@ CANDevicePID sccm_pids[] = {
         .name = "Turn Signals", .short_name = "TS",
         .pid_id = {0x71, 0x50},
 		.num_of_signals = 4,
+		.state_generation = CAN_STATE_GENERATION_MULTIPLEXED_BYTE,
         .signals = {
             { .name = "Left Turn Signal", .short_name = "LT",
               .change_type = STATE_BIT, .data = 0,
@@ -90,8 +95,8 @@ CANDevicePID sccm_pids[] = {
 //
 // Which is a typedef enum CAN_Ids in device_config.h.  Ensure they stay the same!!
 CANDeviceConfig can_devices[CAN_DEVICE_COUNT] = {
-    { .device_name = "BCM", .id.request = CAN_ID_BCM_REQUEST, .id.reply = CAN_ID_BCM_REPLY, .pids = bcm_pids, .pid_count = BCM_PID_COUNT },
-    { .device_name = "SCCM", .id.request = CAN_ID_SCCM_REQUEST, .id.reply = CAN_ID_SCCM_REPLY, .pids = sccm_pids, .pid_count = SCCM_PID_COUNT }
+    { .device_name = "BCM", .id.request = CAN_ID_BCM_REQUEST, .id.response = CAN_ID_BCM_REPLY, .pids = bcm_pids, .pid_count = BCM_PID_COUNT },
+    { .device_name = "SCCM", .id.request = CAN_ID_SCCM_REQUEST, .id.response = CAN_ID_SCCM_REPLY, .pids = sccm_pids, .pid_count = SCCM_PID_COUNT }
 };
 
 // Command Definitions
@@ -113,7 +118,7 @@ CANCommands can_request_commands[] = {
     { .byte = 0x7F, .name = "Negative Response", .short_name = "NegResp" }
 };
 
-CANCommands can_reply_commands[] = {
+CANCommands can_response_commands[] = {
     { .byte = 0x50, .name = "Response: Diagnostic Session Control", .short_name = "Diag Sess" },
     { .byte = 0x51, .name = "Response: ECU Reset", .short_name = "Resp ECU Reset" },
     { .byte = 0x54, .name = "Response: Clear Diagnostic Information", .short_name = "Resp Clr Diag" },
@@ -129,3 +134,33 @@ CANCommands can_reply_commands[] = {
     { .byte = 0x7E, .name = "Response: Tester Present", .short_name = "Resp Tester" },
     { .byte = 0x7F, .name = "Negative Response", .short_name = "Resp Neg" }
 };
+
+CANCommands *get_can_request_command(uint8_t can_cmd_byte) {
+    // Determine the size of the can_request_commands array
+    size_t num_commands = sizeof(can_request_commands) / sizeof(can_request_commands[0]);
+
+    // Iterate over the array to find the matching command
+    for (size_t i = 0; i < num_commands; i++) {
+        if (can_request_commands[i].byte == can_cmd_byte) {
+            return &can_request_commands[i]; // Return pointer to the matching struct
+        }
+    }
+
+    // If no match is found, return NULL
+    return NULL;
+}
+
+CANCommands *get_can_response_command(uint8_t can_cmd_byte) {
+    // Determine the size of the can_response_commands array
+    size_t num_commands = sizeof(can_response_commands) / sizeof(can_response_commands[0]);
+
+    // Iterate over the array to find the matching command
+    for (size_t i = 0; i < num_commands; i++) {
+        if (can_response_commands[i].byte == can_cmd_byte) {
+            return &can_response_commands[i]; // Return pointer to the matching struct
+        }
+    }
+
+    // If no match is found, return NULL
+    return NULL;
+}

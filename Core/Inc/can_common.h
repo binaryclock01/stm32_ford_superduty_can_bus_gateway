@@ -19,6 +19,7 @@ extern "C" {
 #include <stdint.h> // Fixed-width integer type
 #include "device_configs.h"
 #include "main.h"
+#include "config.h"
 
 /* -----------------------------------------------------------------------------
    Constants
@@ -58,6 +59,7 @@ typedef enum {
 typedef uint16_t CAN_PID;                    /**< CAN PID type */
 typedef uint8_t CAN_Payload_Array[DLC_MAX];  /**< CAN message payload data */
 typedef uint32_t CAN_Payload_uint32;         /**< CAN message payload data */
+typedef uint8_t CAN_Command;
 
 /* -----------------------------------------------------------------------------
    Structures
@@ -112,6 +114,7 @@ typedef struct {
  */
 typedef struct {
     uint8_t data_length; /**< Length of the received CAN data. */
+    CAN_Command command;
     CAN_PID pid;        /**< Parsed PID from the CAN message. */
     CAN_Payload_uint32 payload;    /**< Extracted payload from the CAN message. */
 } Parsed_CAN_Data;
