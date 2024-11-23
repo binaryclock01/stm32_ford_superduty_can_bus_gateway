@@ -70,12 +70,6 @@ CRC_HandleTypeDef hcrc;
 
 I2C_HandleTypeDef hi2c1;
 
-SPI_HandleTypeDef hspi1;
-DMA_HandleTypeDef hdma_spi1_tx;
-
-TIM_HandleTypeDef htim3;
-TIM_HandleTypeDef htim14;
-
 UART_HandleTypeDef huart2;
 
 /* Definitions for CAN1_Rx_Task */
@@ -96,7 +90,7 @@ const osThreadAttr_t CAN2_Rx_Task_attributes = {
 osThreadId_t CAN1_Tx_TaskHandle;
 const osThreadAttr_t CAN1_Tx_Task_attributes = {
   .name = "CAN1_Tx_Task",
-  .stack_size = 256 * 4,
+  .stack_size = 512 * 4,
   .priority = (osPriority_t) osPriorityNormal,
 };
 /* Definitions for Housekeeping_Ta */
@@ -110,7 +104,7 @@ const osThreadAttr_t Housekeeping_Ta_attributes = {
 osThreadId_t CAN1_Send_RequeHandle;
 const osThreadAttr_t CAN1_Send_Reque_attributes = {
   .name = "CAN1_Send_Reque",
-  .stack_size = 256 * 4,
+  .stack_size = 512 * 4,
   .priority = (osPriority_t) osPriorityAboveNormal,
 };
 /* Definitions for CAN2_Tx_Task */
@@ -122,37 +116,18 @@ const osThreadAttr_t CAN2_Tx_Task_attributes = {
 };
 /* USER CODE BEGIN PV */
 
-const osMessageQueueAttr_t CAN1_Rx_Queue_attributes = {
-  .name = "CAN1_Rx_Queue"
-};
-
-const osMessageQueueAttr_t CAN2_Rx_Queue_attributes = {
-  .name = "CAN2_Rx_Queue"
-};
-
-const osMessageQueueAttr_t CAN1_Tx_Queue_attributes = {
-  .name = "CAN1_Tx_Queue"
-};
-
-const osMessageQueueAttr_t CAN2_Tx_Queue_attributes = {
-  .name = "CAN2_Tx_Queue"
-};
-
+// Queue attributes are created in rtos.c
 
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
-static void MX_DMA_Init(void);
 static void MX_CAN1_Init(void);
 static void MX_I2C1_Init(void);
 static void MX_CAN2_Init(void);
-static void MX_USART2_UART_Init(void);
-static void MX_SPI1_Init(void);
 static void MX_CRC_Init(void);
-static void MX_TIM3_Init(void);
-static void MX_TIM14_Init(void);
+static void MX_USART2_UART_Init(void);
 void StartCAN1_Rx_Task(void *argument);
 void StartCAN2_Rx_Task(void *argument);
 void StartCAN1_Tx_Task(void *argument);
@@ -265,22 +240,18 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-  MX_DMA_Init();
   MX_CAN1_Init();
   MX_I2C1_Init();
   MX_CAN2_Init();
-  MX_USART2_UART_Init();
-  MX_SPI1_Init();
   MX_CRC_Init();
-  MX_TIM3_Init();
-  MX_TIM14_Init();
+  MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
 
+  send_clear_screen_ansi_code();
   // uart logging system
-  init_log_system();
+  EXECUTE_FUNCTION_AND_FLUSH_LOGS(init_log_system);
+  EXECUTE_FUNCTION_AND_FLUSH_LOGS(display_welcome_message);
 
-  // log the welcome message of program startup
-  display_welcome_message();
 
 #ifdef USE_SSD1306
   ssd1306_Init(); // init OLED screen
@@ -288,24 +259,9 @@ int main(void)
 #endif
 
   // Initialize and log statuses of the HAL CAN buses
-  start_hal_cas_buses();
+  EXECUTE_FUNCTION_AND_FLUSH_LOGS(start_hal_can_buses);
 
-  if (HAL_CAN_Start(&hcan1) != HAL_OK) {
-      user_error_handler(ERROR_CAN_INIT_FAILED, "Failed to start TRUCK CAN");
-      return HAL_ERROR;  // Use HAL-defined error code for system failure
-  }
-
-  // Activate notification for TRUCK CAN
-  if (HAL_CAN_ActivateNotification(&hcan1, CAN_IT_RX_FIFO0_MSG_PENDING) != HAL_OK) {
-      user_error_handler(ERROR_CAN_NOTIFICATION_FAILED, "Failed to activate TRUCK CAN notifications");
-      return HAL_ERROR;  // Use HAL-defined error code for system failure
-  }
-
-  // Activate notification for AUX CAN (hcan2)
-  if (HAL_CAN_ActivateNotification(&hcan2, CAN_IT_RX_FIFO0_MSG_PENDING) != HAL_OK) {
-      user_error_handler(ERROR_CAN_NOTIFICATION_FAILED, "Failed to activate AUX CAN notifications");
-      return HAL_ERROR;  // Use HAL-defined error code for system failure
-  }
+  EXECUTE_FUNCTION_AND_FLUSH_LOGS(activate_can_bus_fifo_callbacks);
 
   /* USER CODE END 2 */
 
@@ -327,21 +283,7 @@ int main(void)
 
   /* USER CODE BEGIN RTOS_QUEUES */
 
-  const osMessageQueueAttr_t *queue_attributes[TOTAL_QUEUES] = {
-      &CAN1_Rx_Queue_attributes,
-      &CAN2_Rx_Queue_attributes,
-      &CAN1_Tx_Queue_attributes,
-      &CAN2_Tx_Queue_attributes
-  };
-
-  for (int i = 0; i < TOTAL_QUEUES; i++) {
-      can_circular_buffer[i].queue_handle = osMessageQueueNew(CAN_PACKET_POOL_SIZE, sizeof(CAN_Packet *), queue_attributes[i]);
-      if (can_circular_buffer[i].queue_handle == NULL) {
-          char error_msg[64];
-          snprintf(error_msg, sizeof(error_msg), "Failed to create queue %d", i);
-          user_error_handler(ERROR_RTOS_QUEUE_INIT_FAILED, error_msg);
-      }
-  }
+  init_rtos_queue_handles();
 
   /* USER CODE END RTOS_QUEUES */
 
@@ -371,6 +313,11 @@ int main(void)
 
   /* USER CODE BEGIN RTOS_EVENTS */
   /* add events, ... */
+  log_message("* Initialization complete.");
+  log_message("--------------------------------------------------------------------------");
+  log_message("");
+  flush_logs();
+
   /* USER CODE END RTOS_EVENTS */
 
   /* Start scheduler */
@@ -592,138 +539,6 @@ static void MX_I2C1_Init(void)
 }
 
 /**
-  * @brief SPI1 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_SPI1_Init(void)
-{
-
-  /* USER CODE BEGIN SPI1_Init 0 */
-
-  /* USER CODE END SPI1_Init 0 */
-
-  /* USER CODE BEGIN SPI1_Init 1 */
-
-  /* USER CODE END SPI1_Init 1 */
-  /* SPI1 parameter configuration*/
-  hspi1.Instance = SPI1;
-  hspi1.Init.Mode = SPI_MODE_MASTER;
-  hspi1.Init.Direction = SPI_DIRECTION_2LINES;
-  hspi1.Init.DataSize = SPI_DATASIZE_8BIT;
-  hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
-  hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
-  hspi1.Init.NSS = SPI_NSS_SOFT;
-  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
-  hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
-  hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
-  hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
-  hspi1.Init.CRCPolynomial = 10;
-  if (HAL_SPI_Init(&hspi1) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN SPI1_Init 2 */
-
-  /* USER CODE END SPI1_Init 2 */
-
-}
-
-/**
-  * @brief TIM3 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_TIM3_Init(void)
-{
-
-  /* USER CODE BEGIN TIM3_Init 0 */
-
-  /* USER CODE END TIM3_Init 0 */
-
-  TIM_MasterConfigTypeDef sMasterConfig = {0};
-  TIM_OC_InitTypeDef sConfigOC = {0};
-
-  /* USER CODE BEGIN TIM3_Init 1 */
-
-  /* USER CODE END TIM3_Init 1 */
-  htim3.Instance = TIM3;
-  htim3.Init.Prescaler = 10000;
-  htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim3.Init.Period = 100;
-  htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-  htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
-  if (HAL_TIM_PWM_Init(&htim3) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
-  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
-  if (HAL_TIMEx_MasterConfigSynchronization(&htim3, &sMasterConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  sConfigOC.OCMode = TIM_OCMODE_PWM1;
-  sConfigOC.Pulse = 0;
-  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
-  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
-  if (HAL_TIM_PWM_ConfigChannel(&htim3, &sConfigOC, TIM_CHANNEL_2) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN TIM3_Init 2 */
-
-  /* USER CODE END TIM3_Init 2 */
-  HAL_TIM_MspPostInit(&htim3);
-
-}
-
-/**
-  * @brief TIM14 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_TIM14_Init(void)
-{
-
-  /* USER CODE BEGIN TIM14_Init 0 */
-
-  /* USER CODE END TIM14_Init 0 */
-
-  TIM_OC_InitTypeDef sConfigOC = {0};
-
-  /* USER CODE BEGIN TIM14_Init 1 */
-
-  /* USER CODE END TIM14_Init 1 */
-  htim14.Instance = TIM14;
-  htim14.Init.Prescaler = 8399;
-  htim14.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim14.Init.Period = 166;
-  htim14.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-  htim14.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
-  if (HAL_TIM_Base_Init(&htim14) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  if (HAL_TIM_PWM_Init(&htim14) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  sConfigOC.OCMode = TIM_OCMODE_PWM1;
-  sConfigOC.Pulse = 0;
-  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
-  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
-  if (HAL_TIM_PWM_ConfigChannel(&htim14, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN TIM14_Init 2 */
-
-  /* USER CODE END TIM14_Init 2 */
-
-}
-
-/**
   * @brief USART2 Initialization Function
   * @param None
   * @retval None
@@ -739,7 +554,7 @@ static void MX_USART2_UART_Init(void)
 
   /* USER CODE END USART2_Init 1 */
   huart2.Instance = USART2;
-  huart2.Init.BaudRate = 115200;
+  huart2.Init.BaudRate = 1000000;
   huart2.Init.WordLength = UART_WORDLENGTH_8B;
   huart2.Init.StopBits = UART_STOPBITS_1;
   huart2.Init.Parity = UART_PARITY_NONE;
@@ -757,22 +572,6 @@ static void MX_USART2_UART_Init(void)
 }
 
 /**
-  * Enable DMA controller clock
-  */
-static void MX_DMA_Init(void)
-{
-
-  /* DMA controller clock enable */
-  __HAL_RCC_DMA2_CLK_ENABLE();
-
-  /* DMA interrupt init */
-  /* DMA2_Stream3_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA2_Stream3_IRQn, 5, 0);
-  HAL_NVIC_EnableIRQ(DMA2_Stream3_IRQn);
-
-}
-
-/**
   * @brief GPIO Initialization Function
   * @param None
   * @retval None
@@ -786,17 +585,10 @@ static void MX_GPIO_Init(void)
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOH_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
-  __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);
-
-  /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOC, DISPL_CS_Pin|TOUCH_CS_Pin, GPIO_PIN_SET);
-
-  /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, DISPL_DC_Pin|DISPL_RST_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : PA5 */
   GPIO_InitStruct.Pin = GPIO_PIN_5;
@@ -804,30 +596,6 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-
-  /*Configure GPIO pins : DISPL_CS_Pin TOUCH_CS_Pin */
-  GPIO_InitStruct.Pin = DISPL_CS_Pin|TOUCH_CS_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
-
-  /*Configure GPIO pins : DISPL_DC_Pin DISPL_RST_Pin */
-  GPIO_InitStruct.Pin = DISPL_DC_Pin|DISPL_RST_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
-
-  /*Configure GPIO pin : TOUCH_INT_Pin */
-  GPIO_InitStruct.Pin = TOUCH_INT_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
-  GPIO_InitStruct.Pull = GPIO_PULLUP;
-  HAL_GPIO_Init(TOUCH_INT_GPIO_Port, &GPIO_InitStruct);
-
-  /* EXTI interrupt init*/
-  HAL_NVIC_SetPriority(EXTI15_10_IRQn, 5, 0);
-  HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
 
 /* USER CODE BEGIN MX_GPIO_Init_2 */
 /* USER CODE END MX_GPIO_Init_2 */
@@ -857,6 +625,7 @@ void StartCAN1_Rx_Task(void *argument)
   for (;;) {
 		if (osMessageQueueGet(can_circular_buffer[QUEUE_RX_CAN1].queue_handle, &packet, NULL, osWaitForever) == osOK)
 			__rtos__StartCAN_Rx_Task(CAN_TRUCK, packet);
+		osDelay(1000);
   }
   /* USER CODE END 5 */
 }
@@ -876,11 +645,12 @@ void StartCAN1_Rx_Task(void *argument)
 void StartCAN2_Rx_Task(void *argument)
 {
   /* USER CODE BEGIN StartCAN2_Rx_Task */
-	CAN_Packet *packet = NULL;
-	for (;;) {
-		if (osMessageQueueGet(can_circular_buffer[QUEUE_RX_CAN2].queue_handle, &packet, NULL, osWaitForever) == osOK)
-			__rtos__StartCAN_Rx_Task(CAN_AUX, packet);
-	}
+	osThreadSuspend(osThreadGetId());
+//	CAN_Packet *packet = NULL;
+//	for (;;) {
+//		if (osMessageQueueGet(can_circular_buffer[QUEUE_RX_CAN2].queue_handle, &packet, NULL, osWaitForever) == osOK)
+//			__rtos__StartCAN_Rx_Task(CAN_AUX, packet);
+//	}
   /* USER CODE END StartCAN2_Rx_Task */
 }
 
@@ -895,13 +665,14 @@ void StartCAN1_Tx_Task(void *argument)
 {
   /* USER CODE BEGIN StartCAN1_Tx_Task */
   /* Infinite loop */
+  osThreadSuspend(osThreadGetId());
 
-  for(;;)
-  {
-	CAN_Packet *packet = NULL;
-	if (osMessageQueueGet(can_circular_buffer[QUEUE_TX_CAN1].queue_handle, &packet, NULL, osWaitForever) == osOK)
-		__rtos__StartCAN_Tx_Task(CAN_TRUCK, packet);
-  }
+//  for(;;)
+//  {
+//	CAN_Packet *packet = NULL;
+//	if (osMessageQueueGet(can_circular_buffer[QUEUE_TX_CAN1].queue_handle, &packet, NULL, osWaitForever) == osOK)
+//		__rtos__StartCAN_Tx_Task(CAN_TRUCK, packet);
+//  }
   /* USER CODE END StartCAN1_Tx_Task */
 }
 
@@ -920,8 +691,9 @@ void StartHousekeeping_Task(void *argument)
   /* USER CODE BEGIN StartHousekeeping_Task */
   for (;;) {
 	__rtos__log_task();
+	//osDelay(1000);
 	// Yield to other threads without a fixed delay
-	osThreadYield();
+	//osThreadYield();
 	  //osThreadSuspend(osThreadGetId());
 #ifdef USE_SSD1306
 	  // Step 1: Update OLED display for the specified CAN instance
@@ -942,27 +714,27 @@ void StartCAN_Tx_Send_Requests(void *argument)
 {
   /* USER CODE BEGIN StartCAN_Tx_Send_Requests */
   /* Infinite loop */
-  for (;;)
-  {
+	for (;;)
+	{
 	  uint32_t queue_length = osMessageQueueGetCount(can_circular_buffer[QUEUE_TX_CAN1].queue_handle);
-	  char msg[100];
-	  if (queue_length > 7)
-		  sprintf(msg, "Cannot send Tx requests - Tx_QueueHandle has %lu elements and it would overflow the buffer.", queue_length);
+	  char msg[255];
+	  if (queue_length > 3)
+	  {
+		  sprintf(msg, "Cannot send Tx requests - Tx_QueueHandle has %lu elements and it would overflow the buffer.\r\n", queue_length);
+		  printf(msg);
+	  }
 	  else
 	  {
-		  // Step 1: Update OLED display for the specified CAN instance
-		  sprintf(msg, "%s", "Sending requests...");
-		  send_all_requests();
+			// Step 1: Update OLED display for the specified CAN instance
+			log_message("* Sending PID status read requests on Truck CAN");
+			flush_logs();
+			send_all_requests();
 	  }
 
-      send_console_msg(msg);
-
       osThreadYield();
-
-      osDelay(ONE_SECOND);
+      osDelay(ms_to_ticks(1000));
+	}
       //osThreadYield();
-
-  }
   /* USER CODE END StartCAN_Tx_Send_Requests */
 }
 

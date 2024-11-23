@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "main.h"
 
 /**
  * @brief Converts a byte array to an integer (uint16_t, uint32_t, or uint64_t) in big-endian order.
@@ -31,6 +32,10 @@ uint64_t bytes_to_uint32(uint8_t *bytes)
     return __builtin_bswap32(*(uint32_t *)bytes);
 }
 */
+
+uint32_t ms_to_ticks(uint32_t ms) {
+    return (ms * osKernelGetTickFreq()) / 1000; // Convert milliseconds to ticks
+}
 
 uint32_t bytes_to_uint32(uint8_t *bytes) {
     uint32_t result = 0;

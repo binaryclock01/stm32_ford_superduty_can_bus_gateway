@@ -29,6 +29,7 @@ extern "C" {
  */
 void osDelayUntilCMSIS(uint32_t *lastWakeTime, uint32_t period);
 
+uint32_t ms_to_ticks(uint32_t ms);
 
 void bytes_to_big_endian(void *dest, const uint8_t *src, size_t size);
 /**

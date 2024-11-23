@@ -23,8 +23,8 @@
 
 typedef enum {
 	QUEUE_RX_CAN1,
-	QUEUE_RX_CAN2,
 	QUEUE_TX_CAN1,
+	QUEUE_RX_CAN2,
 	QUEUE_TX_CAN2,
 	TOTAL_QUEUES,
 	QUEUE_TYPE_UNKNOWN
@@ -51,6 +51,9 @@ typedef struct {
 } CAN_Circular_Buffer;
 
 extern CAN_Circular_Buffer can_circular_buffer[TOTAL_QUEUES];
+extern const char* Circular_Queue_Types_Names[];
+
+void init_rtos_queue_handles(void);
 
 /**
  * @brief Main StartCAN_Rx_Task that will call __rtos_StartCAN_Rx#_Task() depending on the can instance
@@ -75,6 +78,16 @@ bool __rtos_process_tx_queue_and_send_to_can(CANInstance enum_can_instance, CAN_
  * @param hcan Pointer to the CAN hardware instance (e.g., CAN1 or CAN2).
  */
 void process_can_rx_fifo_callback(CAN_HandleTypeDef *hcan);
+
+/**
+ * @brief Processes and sends a CAN packet from RTOS.
+ *
+ * Delegates CAN-specific logic to `can_core.c` for separation of concerns.
+ *
+ * @param packet Pointer to the `CAN_Packet` containing the metadata, header, and payload.
+ * @return true if the packet was successfully transmitted, false otherwise.
+ */
+bool __rtos_send_tx_packet_to_can_interface(CAN_Packet *packet);
 
 /**
  * @brief Initializes the CAN packet pool and its associated mutex.

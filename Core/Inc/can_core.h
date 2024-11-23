@@ -89,12 +89,36 @@ Circular_Queue_Types get_queue_num_by_can_instance(CANInstance can_instance, Que
  */
 void send_can_packet_to_tx_queue(CANInstance can_instance, CANDeviceConfig *device, CANDevicePID *pid, CAN_Verb_Type verb);
 
+void activate_can_bus_fifo_callbacks(void);
+
+/**
+ * @brief Sends a CAN packet using the HAL CAN API.
+ *
+ * Handles CAN-specific operations like header conversion, message transmission,
+ * and logging.
+ *
+ * @param packet Pointer to the `CAN_Packet` containing metadata, header, and payload.
+ * @return true if the packet was successfully transmitted, false otherwise.
+ */
+bool _send_tx_packet_to_can_interface(CAN_Packet *packet);
+
 /**
  * @brief Process and send all CAN requests.
  */
 void send_all_requests(void);
 
 /* --- CAN Packet Reception and Processing Functions --- */
+
+/**
+ * @brief Process signal changes for a given PID and payload.
+ *
+ * Iterates through the signals within the specified PID and checks for changes
+ * based on the provided payload. Updates the signal state if a change is detected.
+ *
+ * @param device_pid Pointer to the `CANDevicePID` containing the signals.
+ * @param payload The received payload data to compare against.
+ */
+void process_signal_changes(CANDevicePID *device_pid, uint32_t payload);
 
 /**
  * @brief Retrieve a message from the CAN FIFO and populate a CAN_Packet.
@@ -182,6 +206,8 @@ CAN_HandleTypeDef *get_hcan_from_instance(CANInstance instance);
  */
 CANInstance get_can_instance_enum(CAN_HandleTypeDef *hcan);
 
+// Define a mapping array to map hardware instances to CANInstance indexes
+CANInstance get_can_instance_from_hcan(CAN_HandleTypeDef *hcan);
 /**
  * @brief Parses raw CAN data into a structured format.
  *

@@ -15,13 +15,25 @@
 
 #include <stdint.h>
 #include "main.h"
+#include "rtos.h"
 
 /* --------------------------------------------------------------------------
    Constants and Macros
    -------------------------------------------------------------------------- */
 
-#define LOG_BUFFER_SIZE 256             /**< Maximum number of messages in the log buffer */
-#define LOG_MESSAGE_MAX_LENGTH 128     /**< Maximum length of each log message */
+#define LOG_BUFFER_SIZE 100    /**< Maximum number of messages in the log buffer */
+#define LOG_MESSAGE_MAX_LENGTH 128    /**< Maximum length of each log message */
+
+
+// execute a function and flush the logs
+// otherwise the logs would sit waiting for the housekeeping task to do it
+// and maybe the task isn't running yet, like initial initialization of HAL
+#define EXECUTE_FUNCTION_AND_FLUSH_LOGS(init_function) \
+    do {                              \
+        init_function();              \
+        flush_logs();                 \
+    } while (0)
+
 
 /* --------------------------------------------------------------------------
    Data Structures
@@ -50,6 +62,8 @@ extern LogBuffer log_buffer;
 
 /* --- Initialization and Setup --- */
 
+void log_queue_packet_counts(void);
+void log_circular_buffer_usage(void);
 /**
  * @brief Initialize the logging system.
  */
@@ -87,6 +101,8 @@ void log_raw_can_packet(const CAN_Packet *packet);
  */
 void log_valid_can_data(const Parsed_CAN_Data *parsed_data);
 
+void flush_logs(void);
+
 /**
  * @brief Log a transmitted CAN message for debugging.
  *
@@ -94,7 +110,7 @@ void log_valid_can_data(const Parsed_CAN_Data *parsed_data);
  * @param TxData Pointer to the payload data.
  * @param dlc Data length code.
  */
-void log_transmitted_can_message(uint64_t request_id, uint8_t *TxData, uint8_t dlc);
+void log_transmitted_can_message(Circular_Queue_Types queue_num, uint64_t request_id, uint8_t *TxData, uint8_t dlc);
 
 /* --- Task Functions --- */
 
@@ -109,5 +125,7 @@ void __rtos__log_task(void);
  * @brief Display the welcome message on the console.
  */
 void display_welcome_message(void);
+
+void send_clear_screen_ansi_code(void);
 
 #endif /* INC_LOG_H_ */

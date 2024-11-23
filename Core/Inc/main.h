@@ -66,8 +66,8 @@ extern I2C_HandleTypeDef hi2c1;
 extern osMessageQueueId_t CAN1_Rx_QueueHandle;
 extern osMessageQueueId_t CAN2_Rx_QueueHandle;
 extern osMessageQueueId_t Tx_QueueHandle;
-extern UART_HandleTypeDef huart2;
 
+extern UART_HandleTypeDef huart2;
 /**
  * @brief Display-related variables.
  */
@@ -93,8 +93,6 @@ extern uint32_t last_can_request_time; /**< Last CAN request timestamp. */
 
 /* USER CODE END EM */
 
-void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim);
-
 /* Exported functions prototypes ---------------------------------------------*/
 void Error_Handler(void);
 
@@ -103,25 +101,6 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
-#define TOUCH_MISO_Pin GPIO_PIN_6
-#define TOUCH_MISO_GPIO_Port GPIOA
-#define DISPL_MOSI_Pin GPIO_PIN_7
-#define DISPL_MOSI_GPIO_Port GPIOA
-#define DISPL_CS_Pin GPIO_PIN_4
-#define DISPL_CS_GPIO_Port GPIOC
-#define TOUCH_CS_Pin GPIO_PIN_5
-#define TOUCH_CS_GPIO_Port GPIOC
-#define DISPL_DC_Pin GPIO_PIN_1
-#define DISPL_DC_GPIO_Port GPIOB
-#define DISPL_RST_Pin GPIO_PIN_2
-#define DISPL_RST_GPIO_Port GPIOB
-#define DISPL_LED_Pin GPIO_PIN_7
-#define DISPL_LED_GPIO_Port GPIOC
-#define TOUCH_INT_Pin GPIO_PIN_10
-#define TOUCH_INT_GPIO_Port GPIOA
-#define TOUCH_INT_EXTI_IRQn EXTI15_10_IRQn
-#define DISPL_SCK_Pin GPIO_PIN_3
-#define DISPL_SCK_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
 // Add any additional private defines here

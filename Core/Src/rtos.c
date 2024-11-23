@@ -15,6 +15,8 @@
 #include "can_core.h"
 #include "error.h" // For error handling
 #include "ui.h"
+#include "log.h"
+#include "ansi.h"
 
 // Mutex for protecting the CAN packet pool
 
@@ -31,18 +33,83 @@ osMessageQueueId_t CAN2_Tx_QueueHandle;
 
 CAN_Circular_Buffer can_circular_buffer[TOTAL_QUEUES];
 
-/**
- * @brief Initialize all circular buffers with mutexes.
- */
+const osMessageQueueAttr_t CAN1_Rx_Queue_attributes = {
+  .name = "CAN1_Rx_Queue"
+};
+
+const osMessageQueueAttr_t CAN2_Rx_Queue_attributes = {
+  .name = "CAN2_Rx_Queue"
+};
+
+const osMessageQueueAttr_t CAN1_Tx_Queue_attributes = {
+  .name = "CAN1_Tx_Queue"
+};
+
+const osMessageQueueAttr_t CAN2_Tx_Queue_attributes = {
+  .name = "CAN2_Tx_Queue"
+};
+
+const char* Circular_Queue_Types_Names[] = {
+    "QUEUE_RX_CAN1",
+    "QUEUE_TX_CAN1",
+    "QUEUE_RX_CAN2",
+    "QUEUE_TX_CAN2",
+    "TOTAL_QUEUES",
+    "QUEUE_TYPE_UNKNOWN"
+};
+
+void init_rtos_queue_handles(void)
+{
+	char buf[255];
+
+    log_message("* Initializing RTOS queue handles");
+    flush_logs();
+
+    const osMessageQueueAttr_t *queue_attributes[TOTAL_QUEUES] = {
+        &CAN1_Rx_Queue_attributes,
+        &CAN1_Tx_Queue_attributes,
+        &CAN2_Rx_Queue_attributes,
+        &CAN2_Tx_Queue_attributes
+    };
+
+	for (int i = 0; i < TOTAL_QUEUES; i++) {
+		can_circular_buffer[i].queue_handle = osMessageQueueNew(CAN_PACKET_POOL_SIZE, sizeof(CAN_Packet *), queue_attributes[i]);
+
+        sprintf(buf, "  - Queue handle %s%s%s initializing", HWHT, Circular_Queue_Types_Names[i], CRESET);
+
+		if (can_circular_buffer[i].queue_handle == NULL) {
+            log_status_message(buf, false);
+            flush_logs();
+			user_error_handler(ERROR_RTOS_QUEUE_INIT_FAILED, "Failed to initialized queue handle for %s", Circular_Queue_Types_Names[i]);
+		}
+		log_status_message(buf, true);
+		flush_logs();
+	}
+}
+
 void init_circular_buffers(void) {
+    char buf[255];
+
+    log_message("* Initializing CAN circular buffers");
+    flush_logs();
+
     for (int i = 0; i < TOTAL_QUEUES; i++) {
         can_circular_buffer[i] = (CAN_Circular_Buffer){0}; // Clear the buffer
         can_circular_buffer[i].mutex_id = osMutexNew(NULL); // Create a mutex for the buffer
+
+        // Use the enum name instead of the number
+        sprintf(buf, "  - Circular buffer %s%s%s initializing", HWHT, Circular_Queue_Types_Names[i], CRESET);
+
         if (can_circular_buffer[i].mutex_id == NULL) {
-            user_error_handler(ERROR_RTOS_MUTEX_INIT_FAILED, "Failed to initialize mutex for circular buffer %d", i);
+            log_status_message(buf, false);
+            flush_logs();
+            user_error_handler(ERROR_RTOS_MUTEX_INIT_FAILED, "Failed to initialize mutex for circular buffer %s", Circular_Queue_Types_Names[i]);
         }
+        log_status_message(buf, true);
+        flush_logs();
     }
 }
+
 
 /**
  * @brief Allocates a CAN packet from the circular buffer.
@@ -166,6 +233,7 @@ bool __rtos_send_tx_packet_to_can_interface(CANInstance enum_can_instance, CAN_P
 
 void __rtos__StartCAN_Rx_Task(CANInstance enum_can_instance, CAN_Packet *packet)
 {
+	log_message(CRESET "* " BYEL "RTOS TASK CALL:" YEL "__rtos__StartCan_Rx_Task" CRESET);
 	Circular_Queue_Types queue_enum = QUEUE_TYPE_UNKNOWN;
 
 	// TODO: probably a better way to do this with enums and structs, but this is what it is for now.
@@ -203,6 +271,7 @@ void __rtos__StartCAN_Rx_Task(CANInstance enum_can_instance, CAN_Packet *packet)
 
 void __rtos__StartCAN_Tx_Task(CANInstance enum_can_instance, CAN_Packet *packet)
 {
+	log_message(CRESET "* " BYEL "RTOS TASK CALL:" YEL "__rtos__StartCan_Tx_Task" CRESET);
 	Circular_Queue_Types queue_enum = QUEUE_TYPE_UNKNOWN;
 
 	// TODO: probably a better way to do this with enums and structs, but this is what it is for now.
@@ -220,7 +289,7 @@ void __rtos__StartCAN_Tx_Task(CANInstance enum_can_instance, CAN_Packet *packet)
 			break;
 		default:
 			char error_msg[100]; // a lot more chars just in case the __func__ name changes :)
-			snprintf(error_msg, sizeof(error_msg), "%s with enum_can_instance = %d", __func__, enum_can_instance);
+			snprintf(error_msg, sizeof(error_msg), "%s with enum_can_instance = %d\r\n", __func__, enum_can_instance);
 			user_error_handler(ERROR_RTOS_QUEUE_INVALID_HANDLE, error_msg);
 			return;
 	}
@@ -236,6 +305,33 @@ void __rtos__StartCAN_Tx_Task(CANInstance enum_can_instance, CAN_Packet *packet)
 	__rtos_send_tx_packet_to_can_interface(packet);
 }
 
+/**
+ * @brief Processes and sends a CAN packet from RTOS.
+ *
+ * Delegates CAN-specific logic to `can_core.c` for separation of concerns.
+ *
+ * @param packet Pointer to the `CAN_Packet` containing the metadata, header, and payload.
+ * @return true if the packet was successfully transmitted, false otherwise.
+ */
+bool __rtos_send_tx_packet_to_can_interface(CAN_Packet *packet) {
+    if (packet == NULL) {
+        user_error_handler(ERROR_INVALID_ARGUMENT, "Tx packet pointer is NULL");
+        return false;
+    }
+
+    // Delegate to CAN-specific function in can_core.c
+    bool result = _send_tx_packet_to_can_interface(packet);
+
+/*
+    // Log the result
+    if (result) {
+        log_status_message("|| RTOS CAN Tx", true);
+    } else {
+        log_status_message("|| Tx Queue ", false);
+    }
+*/
+    return result;
+}
 
 /**
  * @brief Processes a CAN Rx FIFO0 message callback.

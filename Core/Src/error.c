@@ -26,6 +26,7 @@
 #include <string.h>
 #include "error.h"
 #include "ui.h"
+#include "log.h"
 
 /* -----------------------------------------------------------------------------
    Error Table
@@ -136,6 +137,9 @@ void user_error_handler(ErrorCodes error_code, const char *format, ...) {
         va_end(args);
     }
 
+    // ensure to flush any status logs before printing the error, so that the error is not out of sync with
+    // what led up to it.
+    flush_logs();
     // Log the error to the console with category and severity
     printf(HGRN "* " REDB "\e[1;97mERROR #%u" CRESET "["  // Bright red background and bold white text for ERROR
            HBLU "%s" CRESET "] ("                         // Blue category in brackets
