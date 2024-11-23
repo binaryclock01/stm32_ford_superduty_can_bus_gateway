@@ -7,6 +7,7 @@
 
 #include "device_configs.h"
 
+
 // BCM Configurations Array
 CANDevicePID bcm_pids[] = {
     {
@@ -16,7 +17,9 @@ CANDevicePID bcm_pids[] = {
         .signals = {
             { .name = "Hazard Button", .short_name = "Hzd",
               .change_type = STATE_BIT, .data = 0,
-              .change_data = {0x04, 0x00, 0x00, 0x00} }
+			  .relevant_data_bytes = 4,
+			  .state_off   = {0x00, 0x00, 0x00, 0x00},
+              .state_on    = {0x04, 0x00, 0x00, 0x00} }
         }
     },
     {
@@ -26,7 +29,9 @@ CANDevicePID bcm_pids[] = {
 		.signals = {
             { .name = "Brake Pedal", .short_name = "Brk",
               .change_type = STATE_BIT, .data = 0,
-              .change_data = {0x40, 0x00, 0x00, 0x00} }
+			  .relevant_data_bytes = 4,
+			  .state_off   = {0x20, 0x00, 0x00, 0x00},
+              .state_on    = {0x40, 0x00, 0x00, 0x00} }
         }
     },
     {
@@ -36,7 +41,9 @@ CANDevicePID bcm_pids[] = {
         .signals = {
             { .name = "Reverse Light", .short_name = "Rev",
               .change_type = STATE_BIT, .data = 0,
-              .change_data = {0x01, 0x00, 0x00, 0x00} }
+			  .relevant_data_bytes = 1,
+			  .state_off   = {0x02, 0xCC, 0xCC, 0xCC},
+              .state_on    = {0x01, 0xCC, 0xCC, 0xCC} }
         }
     }
 };
@@ -50,16 +57,27 @@ CANDevicePID sccm_pids[] = {
         .signals = {
             { .name = "Left Turn Signal", .short_name = "LT",
               .change_type = STATE_BIT, .data = 0,
-              .change_data = {0x01, 0x00, 0x00, 0x00} },
+			  .relevant_data_bytes = 4,
+              .state_off  = {0x00, 0x00, 0x00, 0x00},
+              .state_on   = {0x01, 0x00, 0x00, 0x00} },
+
             { .name = "Right Turn Signal", .short_name = "RT",
               .change_type = STATE_BIT, .data = 0,
-              .change_data = {0x02, 0x00, 0x00, 0x00} },
+			  .relevant_data_bytes = 4,
+              .state_off  = {0x00, 0x00, 0x00, 0x00},
+              .state_on   = {0x02, 0x00, 0x00, 0x00} },
+
             { .name = "Left Lane Change", .short_name = "LC",
               .change_type = STATE_BIT, .data = 0,
-              .change_data = {0x00, 0x02, 0x00, 0x00} },
+			  .relevant_data_bytes = 4,
+              .state_off  = {0x00, 0x00, 0x00, 0x00},
+              .state_on   = {0x00, 0x02, 0x00, 0x00} },
+
             { .name = "Right Lane Change", .short_name = "RC",
               .change_type = STATE_BIT, .data = 0,
-              .change_data = {0x00, 0x04, 0x00, 0x00} }
+			  .relevant_data_bytes = 4,
+              .state_off  = {0x00, 0x00, 0x00, 0x00},
+              .state_on   = {0x00, 0x04, 0x00, 0x00} },
         }
     }
 };

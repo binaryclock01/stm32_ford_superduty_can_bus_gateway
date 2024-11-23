@@ -56,6 +56,13 @@ typedef enum {
     UINT64_PID_MASK     = 0x0000FFFF00000000,
 } CANMasks;
 
+typedef enum {
+    RELEVANT_1_BYTE = 0xFF000000,  // Mask for 1 relevant byte (MSB)
+    RELEVANT_2_BYTE = 0xFFFF0000, // Mask for 2 relevant bytes (MSB + next byte)
+    RELEVANT_3_BYTE = 0xFFFFFF00, // Mask for 3 relevant bytes
+    RELEVANT_4_BYTE = 0xFFFFFFFF  // Mask for 4 relevant bytes (all bytes relevant)
+} RelevantByteMask;
+
 /* -----------------------------------------------------------------------------
    CAN Message Bit Indexes
    -------------------------------------------------------------------------- */
@@ -82,7 +89,9 @@ typedef struct {
     const char *name;                     // Full name of the signal
     const char *short_name;               // Short name for display
     CANStateChangeType change_type;       // Type of state change
-    uint8_t change_data[MAX_PAYLOAD_BYTE_LENGTH]; // Mask for "on" state
+    CAN_Payload_Array state_off; // Mask for "off" state
+    CAN_Payload_Array state_on; // Mask for "on" state
+    uint8_t relevant_data_bytes;
     uint32_t data;                        // Current signal state or data
 } CANSignal;
 
@@ -189,5 +198,21 @@ extern CANCommands can_reply_commands[];   // Array of CAN reply commands
    Device Configuration Array
    -------------------------------------------------------------------------- */
 extern CANDeviceConfig can_devices[];  // Array of all CAN device configurations
+
+static inline uint32_t get_relevant_mask(uint8_t relevant_data_bytes) {
+    static const RelevantByteMask masks[] = {
+        RELEVANT_1_BYTE,  // relevant_data_bytes = 1
+        RELEVANT_2_BYTE, // relevant_data_bytes = 2
+        RELEVANT_3_BYTE, // relevant_data_bytes = 3
+        RELEVANT_4_BYTE  // relevant_data_bytes = 4
+    };
+
+    if (relevant_data_bytes >= 1 && relevant_data_bytes <= 4) {
+        return masks[relevant_data_bytes - 1];
+    }
+
+    return RELEVANT_4_BYTE; // Default to all bytes relevant if input is invalid
+}
+
 
 #endif /* SRC_DEVICE_CONFIGS_H_ */

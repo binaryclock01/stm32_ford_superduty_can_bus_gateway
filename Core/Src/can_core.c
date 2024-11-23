@@ -434,6 +434,16 @@ CANDevicePID *get_pid_by_id(CANDeviceConfig *module, uint16_t pid) {
     return NULL;
 }
 
+bool is_signal_on(const CANSignal *signal, uint32_t payload) {
+    uint32_t mask = get_relevant_mask(signal->relevant_data_bytes);
+
+    // Mask both the payload and the state_on signal
+    uint32_t masked_payload = payload & mask;
+    uint32_t masked_state_on = *((uint32_t *)signal->state_on) & mask;
+
+    // Compare masked values
+    return (masked_payload == masked_state_on);
+}
 /**
  * @brief Process signal changes for a given PID and payload.
  *
@@ -449,7 +459,7 @@ void process_signal_changes(CANDevicePID *device_pid, uint32_t payload) {
 
         switch (signal->change_type) {
             case STATE_BIT:
-                signal->data = (payload & bytes_to_uint32((uint8_t *)signal->change_data)) ? 1 : 0;
+            	signal->data = (is_signal_on(signal, payload) ? 1 : 0);
                 break;
             case STATE_BYTE:
                 // TODO: Implement STATE_BYTE condition
