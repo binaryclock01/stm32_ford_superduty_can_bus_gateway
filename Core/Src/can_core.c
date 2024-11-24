@@ -814,7 +814,7 @@ void process_can_rx_packet(Circular_Queue_Types queue_enum, CANInstance can_inst
 #ifdef IS_SIMULATOR
     		// then generate a new packet to respond to the received packet
     		__sim__generate_packet_response_from_truck(pid_config, parsed_data.command);
-#elif
+#else
     		// if this is not a simulator, then process the signal change
     	    process_signal_changes(pid_config, parsed_data.payload);
 #endif

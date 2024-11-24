@@ -9,6 +9,6 @@
 #define INC_CONFIG_H_
 
 // if this is uncommented, the program acts as if it was the truck, simulating can responses to requests
-#define IS_SIMULATOR
+//#define IS_SIMULATOR
 
 #endif /* INC_CONFIG_H_ */

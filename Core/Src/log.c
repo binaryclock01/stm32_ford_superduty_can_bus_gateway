@@ -129,6 +129,7 @@ void log_message(const char *format, ...) {
 	}
 
     char buf[LOG_MESSAGE_MAX_LENGTH];
+    char final_buf[LOG_MESSAGE_MAX_LENGTH];
 
     // Acquire the mutex
     if (osMutexAcquire(log_buffer->mutex_id, osWaitForever) != osOK) {
@@ -155,6 +156,13 @@ void log_message(const char *format, ...) {
 #endif
 
     va_end(args);
+
+#ifdef IS_SIMULATOR
+    snprintf(final_buf, sizeof(final_buf), "SIM: %s", buf);
+#else
+    strncpy(final_buf, buf, sizeof(final_buf) - 1);
+    final_buf[sizeof(final_buf) - 1] = '\0'; // Null-terminate
+#endif
 
     // Copy the message into the circular buffer
     strncpy(log_buffer->messages[log_buffer->head], buf, LOG_MESSAGE_MAX_LENGTH - 1);
