@@ -17,15 +17,15 @@ extern "C" {
 #endif
 
 #include <stdint.h> // Fixed-width integer type
-#include "device_configs.h"
 #include "main.h"
+#include "device_configs.h"
 #include "config.h"
 
 /* -----------------------------------------------------------------------------
    Constants
    -------------------------------------------------------------------------- */
 
-#define DLC_MAX 8 /**< Maximum data length for standard CAN frames */
+
 
 /* -----------------------------------------------------------------------------
    Enumerations
@@ -101,6 +101,11 @@ typedef struct {
     CAN_Header header;         /**< Unified CAN header. */
     CAN_Payload_Array payload; /**< CAN message payload. */
 } CAN_Packet;
+
+typedef struct {
+	CAN_RxHeaderTypeDef header;
+	CAN_Payload_Array payload;
+} CAN_Rx_Packet;
 
 typedef struct {
     CAN_Packet_Flow flow;      /**< Direction of the packet (Rx or Tx). */

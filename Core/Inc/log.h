@@ -14,15 +14,15 @@
 #define INC_LOG_H_
 
 #include <stdint.h>
+#include "config.h"
 #include "main.h"
 #include "rtos.h"
+#include "buffers.h"
+
 
 /* --------------------------------------------------------------------------
    Constants and Macros
    -------------------------------------------------------------------------- */
-
-#define LOG_BUFFER_SIZE 16   /**< Maximum number of messages in the log buffer */
-#define LOG_MESSAGE_MAX_LENGTH 256   /**< Maximum length of each log message */
 
 
 // execute a function and flush the logs

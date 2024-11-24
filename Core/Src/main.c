@@ -17,27 +17,35 @@
   */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
+#include <callbacks.h>
 #include "main.h"
 #include "cmsis_os.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 
-#include "config.h"
-#include <device_configs.h>	// Include the configurations for devices
 #include <string.h>  // For memcpy
 #include <stdio.h> // for printf
 #include <stdbool.h> // for boolean support in c
-#include "ssd1306.h" // for OLED screen https://github.com/afiskon/stm32-ssd1306
-#include "ssd1306_fonts.h"
+#include "config.h"
+#include "can_common.h"
+#include "device_configs.h"
+
+
+
+
 #include "log.h"
 #include "ui.h"
 #include "error.h"
-#include "device_configs.h"
 #include "rtos.h"
 #include "can_core.h"
 #include "utils.h"
 #include "system.h"
+#include "buffers.h"
+
+#include "ssd1306.h" // for OLED screen https://github.com/afiskon/stm32-ssd1306
+#include "ssd1306_fonts.h"
+
 
 #ifdef IS_SIMULATOR
 #include "sim.h"
@@ -194,10 +202,10 @@ bool configure_can_filter(CAN_HandleTypeDef *hcan, const CAN_FilterTypeDef *filt
  *
  * This function is triggered by the HAL when a message is received in the
  * CAN Rx FIFO0. It delegates the handling of the received message to the
- * `process_can_rx_fifo_callback` function in `rtos.c`. This keeps the interrupt
+ * `__callback__process_can_rx_fifo_callback` function in `rtos.c`. This keeps the interrupt
  * service routine (ISR) lightweight and focused.
  *
- * The `process_can_rx_fifo_callback` function is responsible for:
+ * The `__callback__process_can_rx_fifo_callback` function is responsible for:
  * - Determining the corresponding CAN instance and message queue.
  * - Allocating a CAN packet from the memory pool.
  * - Retrieving the message from the CAN peripheral.
@@ -208,9 +216,9 @@ bool configure_can_filter(CAN_HandleTypeDef *hcan, const CAN_FilterTypeDef *filt
  * @param hcan Pointer to the CAN hardware instance (e.g., CAN1 or CAN2).
  */
 void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan) {
-    // Delegate the handling of the CAN Rx FIFO0 message to `process_can_rx_fifo_callback`
+    // Delegate the handling of the CAN Rx FIFO0 message to `__callback__process_can_rx_fifo_callback`
     // This keeps the ISR clean and lightweight.
-    process_can_rx_fifo_callback(hcan);
+    __callback__process_can_rx_fifo_callback(hcan);
 }
 
 /* USER CODE END 0 */

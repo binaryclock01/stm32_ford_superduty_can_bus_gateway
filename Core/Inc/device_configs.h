@@ -108,7 +108,7 @@ typedef struct {
     const char *name;                     // Full name of the signal
     const char *short_name;               // Short name for display
     CANStateChangeType change_type;       // Type of state change
-    CAN_Payload_Array state_off; // Mask for "off" state
+
     CAN_Payload_Array state_on; // Mask for "on" state
     uint8_t relevant_data_bytes;
     uint32_t data;                        // Current signal state or data

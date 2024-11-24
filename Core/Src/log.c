@@ -158,14 +158,14 @@ void log_message(const char *format, ...) {
     va_end(args);
 
 #ifdef IS_SIMULATOR
-    snprintf(final_buf, sizeof(final_buf), "SIM: %s", buf);
+    snprintf(final_buf, sizeof(final_buf), YEL "SIM: " CRESET "%s", buf);
 #else
     strncpy(final_buf, buf, sizeof(final_buf) - 1);
     final_buf[sizeof(final_buf) - 1] = '\0'; // Null-terminate
 #endif
 
     // Copy the message into the circular buffer
-    strncpy(log_buffer->messages[log_buffer->head], buf, LOG_MESSAGE_MAX_LENGTH - 1);
+    strncpy(log_buffer->messages[log_buffer->head], final_buf, LOG_MESSAGE_MAX_LENGTH - 1);
     log_buffer->messages[log_buffer->head][LOG_MESSAGE_MAX_LENGTH - 1] = '\0'; // Null-terminate
 
     // Update the buffer state
