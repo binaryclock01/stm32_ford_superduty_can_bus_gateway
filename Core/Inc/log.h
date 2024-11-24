@@ -16,6 +16,7 @@
 #include <stdint.h>
 #include "config.h"
 #include "main.h"
+#include "can_common.h"
 #include "rtos.h"
 #include "buffers.h"
 

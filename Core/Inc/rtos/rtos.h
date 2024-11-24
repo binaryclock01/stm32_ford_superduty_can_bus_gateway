@@ -19,6 +19,8 @@ extern "C" {
 #include <stdint.h>              // For fixed-width integer types
 #include <stdbool.h>             // For boolean support
 #include "cmsis_os2.h"           // For RTOS constructs
+
+#include "buffers.h"
 #include "can_common.h"          // For CAN utilities
 #include "log.h"                 // For logging utilities
 

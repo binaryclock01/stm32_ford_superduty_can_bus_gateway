@@ -5,8 +5,13 @@
  *      Author: Ryan
  */
 
+#include <stdio.h>
+
 #include "buffers.h"
 #include "config.h"
+#include "can_helper.h"
+#include "ansi.h"
+#include "error.h"
 
 
 // Circular buffer for all queues and CANs

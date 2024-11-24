@@ -16,7 +16,12 @@
  * @param TxData Pointer to the data buffer where the payload will be stored.
  */
 
+#include <stdio.h>
+
 #include "can_tx.h"
+#include "can_common.h"
+#include "can_helper.h"
+#include "error.h"
 
 
 void generate_can_tx_read_data_payload(CANDeviceConfig *device, CANDevicePID *pid, uint8_t *TxData) {

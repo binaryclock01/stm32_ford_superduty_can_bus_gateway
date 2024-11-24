@@ -17,8 +17,10 @@ extern "C" {
 #endif
 
 #include <stdint.h> // Fixed-width integer type
+#include <stdbool.h>
+
 #include "main.h"
-#include "device_configs.h"
+//#include "device_configs.h"
 #include "config.h"
 
 /* -----------------------------------------------------------------------------
@@ -50,6 +52,8 @@ typedef enum {
     PACKET_RX,
     PACKET_TX
 } CAN_Packet_Flow;
+
+
 
 
 /* -----------------------------------------------------------------------------
@@ -101,6 +105,48 @@ typedef struct {
     CAN_Header header;         /**< Unified CAN header. */
     CAN_Payload_Array payload; /**< CAN message payload. */
 } CAN_Packet;
+
+
+
+
+const char* Circular_Queue_Types_Names[] = {
+	    "QUEUE_RX_CAN1",
+	    "QUEUE_TX_CAN1",
+	    "QUEUE_RX_CAN2",
+	    "QUEUE_TX_CAN2",
+	    "TOTAL_QUEUES",
+	    "QUEUE_TYPE_UNKNOWN"
+	};
+
+typedef enum {
+	QUEUE_RX_CAN1,
+	QUEUE_TX_CAN1,
+	QUEUE_RX_CAN2,
+	QUEUE_TX_CAN2,
+	TOTAL_QUEUES,
+	QUEUE_TYPE_UNKNOWN
+} Circular_Queue_Types;
+
+typedef enum {
+	QUEUE_TYPE_FLOW_UNKNOWN,
+	QUEUE_TYPE_FLOW_TX,
+	QUEUE_TYPE_FLOW_RX,
+} Queue_Type_Flow;
+
+typedef struct {
+	uint32_t total_packets;
+} CAN_Circular_Buffer_Meta;
+
+
+typedef struct {
+    CAN_Packet packets[CAN_BUFFER_SIZE]; /**< Circular buffer of TX packets. */
+    uint8_t head;                          /**< Index of the next write position. */
+    uint8_t tail;                          /**< Index of the next read position. */
+    uint8_t count;                        /**< Number of packets currently in the buffer. */
+    osMutexId_t mutex_id;
+    osMessageQueueId_t queue_handle;
+    CAN_Circular_Buffer_Meta meta;
+} CAN_Circular_Buffer;
 
 typedef struct {
 	CAN_RxHeaderTypeDef header;
