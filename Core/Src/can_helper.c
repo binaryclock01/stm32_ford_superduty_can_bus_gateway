@@ -10,6 +10,8 @@
 #include "can_common.h"
 #include "error.h"
 #include "buffers.h"
+#include "can_packet.h"
+#include "device_configs.h"
 
 /**
  * @brief Retrieves the CAN instance for the given hardware instance.

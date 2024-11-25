@@ -47,7 +47,7 @@ extern "C" {
 #include "cmsis_os.h"        // RTOS CMSIS types, such as osMutedId_t
 //#include "device_configs.h"
 #include "buffers.h"
-#include "can_common.h"
+//#include "can_common.h"
 #include "ssd1306_conf.h"
 //#include "rtos.h"
 

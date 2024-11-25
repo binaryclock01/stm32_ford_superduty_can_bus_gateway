@@ -13,14 +13,18 @@
 #ifndef INC_LOG_H_
 #define INC_LOG_H_
 
+//#include "can_common.h"
 #include <stdint.h>
+
 #include "config.h"
 #include "main.h"
-#include "can_common.h"
+
 #include "rtos.h"
 #include "buffers.h"
+#include "can_packet.h"
+//#include "can_common.h"
 
-
+struct CAN_Packet;
 /* --------------------------------------------------------------------------
    Constants and Macros
    -------------------------------------------------------------------------- */
@@ -116,7 +120,7 @@ void flush_logs(void);
  * @param TxData Pointer to the payload data.
  * @param dlc Data length code.
  */
-void log_transmitted_can_message(Circular_Queue_Types queue_num, uint64_t request_id, uint8_t *TxData, uint8_t dlc);
+//void log_transmitted_can_message(Circular_Queue_Types queue_num, uint64_t request_id, uint8_t *TxData, uint8_t dlc);
 
 /* --- Task Functions --- */
 

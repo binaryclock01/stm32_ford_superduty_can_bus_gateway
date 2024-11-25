@@ -16,14 +16,28 @@
 extern "C" {
 #endif
 
+
+#include <inttypes.h>
+#include <stdint.h>              // For fixed-width integer types
+#include <stdbool.h>             // For boolean support
+
+#include "buffers.h"
+#include "can_common.h"          // Common CAN utilities
+//#include "device_configs.h"      // For CANDeviceConfig, CANDevicePID, etc.
+//#include "rtos.h"
+
+
+/*
 #include <stdint.h>              // For fixed-width integer types
 #include <stdbool.h>             // For boolean support
 #include "buffers.h"
 #include "can_common.h"
+*/
 
 /* --------------------------------------------------------------------------
    Function Declarations
    -------------------------------------------------------------------------- */
+
 
 /**
  * @brief Process a received CAN packet.
@@ -57,7 +71,7 @@ void normalize_rx_hal_header(const CAN_RxHeaderTypeDef *hal_rx_header, CAN_Heade
  * @param packet Pointer to the CAN_Packet to store the received message.
  * @return true if the message was successfully retrieved, false otherwise.
  */
-bool get_rx_message_from_CAN_RX_FIFO0(CAN_HandleTypeDef *hcan);
+bool get_rx_message_from_CAN_RX_FIFO0(CAN_HandleTypeDef *hcan, CAN_Rx_Packet *packet);
 
 #ifdef __cplusplus
 }

@@ -18,7 +18,9 @@ extern "C" {
 
 #include <stdint.h>              // For fixed-width integer types
 #include "rtos_tasks.h"
-#include "can_common.h"          // Common CAN utilities
+#include "can_packet.h"
+
+//#include "can_common.h"          // Common CAN utilities
 
 
 /* --------------------------------------------------------------------------

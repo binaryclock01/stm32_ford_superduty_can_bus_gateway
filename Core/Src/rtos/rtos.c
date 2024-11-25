@@ -22,6 +22,7 @@
 #include "ansi.h"
 #include "buffers.h"
 #include "error.h" // For error handling
+#include "can_tx.h"
 
 
 const osMessageQueueAttr_t CAN1_Rx_Queue_attributes = {

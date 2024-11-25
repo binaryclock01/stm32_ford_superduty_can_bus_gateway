@@ -12,7 +12,8 @@
 #include <stdbool.h>  // For boolean support
 
 #include "config.h"
-#include "can_common.h"
+#include "can_packet.h"
+//#include "can_common.h"
 
 /* -----------------------------------------------------------------------------
    Constants and Macros
@@ -110,6 +111,7 @@ typedef struct {
     CANStateChangeType change_type;       // Type of state change
 
     CAN_Payload_Array state_on; // Mask for "on" state
+    CAN_Payload_Array state_off;
     uint8_t relevant_data_bytes;
     uint32_t data;                        // Current signal state or data
 } CANSignal;

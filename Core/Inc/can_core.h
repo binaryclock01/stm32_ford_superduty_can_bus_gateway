@@ -21,7 +21,7 @@ extern "C" {
 
 #include "config.h"
 #include "device_configs.h"     // CANDeviceConfig, CANDevicePID, etc.
-#include "can_common.h"         // Common CAN utilities
+//#include "can_common.h"         // Common CAN utilities
 #include "rtos.h"               // RTOS utilities
 #include "config.h"
 

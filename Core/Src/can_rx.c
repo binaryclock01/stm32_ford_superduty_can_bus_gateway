@@ -22,6 +22,19 @@
  * ** the calling function will free the packet after this function returns.
  */
 
+#include <inttypes.h>
+#include <stdbool.h>
+#include <stdio.h>
+
+#include "buffers.h"
+#include "can_rx.h"
+
+#include "can_packet.h"
+#include "can_common.h"
+#include "error.h"
+
+#include "can_helper.h"
+
 void process_can_rx_packet(Circular_Queue_Types queue_enum, CANInstance can_instance_enum, CAN_Packet *packet) {
     // Step 1: Validate the input
     if (packet == NULL) {
@@ -138,7 +151,7 @@ void normalize_rx_hal_header(const CAN_RxHeaderTypeDef *hal_rx_header, CAN_Heade
  * @param packet Pointer to the `CAN_Packet` where the received message will be stored.
  * @return true if the message was successfully retrieved and valid, false otherwise.
  */
-bool get_rx_message_from_CAN_RX_FIFO0(CAN_HandleTypeDef *hcan) {
+bool get_rx_message_from_CAN_RX_FIFO0(CAN_HandleTypeDef *hcan, CAN_Rx_Packet *packet) {
     // Step 1: Validate `hcan`.
     if (hcan == NULL) {
         user_error_handler(ERROR_CAN_INVALID_CONTEXT, "NULL CAN_HandleTypeDef provided to get_rx_message_from_CAN_RX_FIFO0");
@@ -186,9 +199,9 @@ bool get_rx_message_from_CAN_RX_FIFO0(CAN_HandleTypeDef *hcan) {
     packet->flow = PACKET_RX;
     packet->meta.can_instance = can_instance;
     packet->meta.timestamp = HAL_GetTick();
-*
+*/
     // Step 9: Log the raw CAN message for debugging.
-    log_raw_can_packet(packet);
+    //log_raw_can_packet(packet);
 
     // Step 10: Return success.
     return true;

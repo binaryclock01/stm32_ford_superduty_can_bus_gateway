@@ -13,6 +13,15 @@
 #include "ansi.h"
 #include "error.h"
 
+const char* Circular_Queue_Types_Names[] = {
+	    "QUEUE_RX_CAN1",
+	    "QUEUE_TX_CAN1",
+	    "QUEUE_RX_CAN2",
+	    "QUEUE_TX_CAN2",
+	    "TOTAL_QUEUES",
+	    "QUEUE_TYPE_UNKNOWN"
+	};
+
 
 // Circular buffer for all queues and CANs
 

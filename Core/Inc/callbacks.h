@@ -21,6 +21,7 @@ extern "C" {
 #include "can_common.h"          // Common CAN utilities
 #include "log.h"                 // Logging utilities
 #include "error.h"               // Error handling utilities
+#include "buffers.h"
 #include "can_rx.h"              // CAN Rx processing functions
 
 /* --------------------------------------------------------------------------

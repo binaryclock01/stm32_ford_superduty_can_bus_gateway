@@ -18,10 +18,9 @@ extern "C" {
 
 #include <stdint.h>              // For fixed-width integer types
 #include <stdbool.h>             // For boolean support
-#include "can_common.h"          // Common CAN utilities
+//#include "can_common.h"          // Common CAN utilities
 #include "device_configs.h"      // For CANDeviceConfig, CANDevicePID, etc.
 #include "rtos.h"                // For RTOS utilities
-
 
 /* --------------------------------------------------------------------------
    Function Declarations

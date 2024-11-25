@@ -12,6 +12,7 @@
 #include "can_common.h"
 #include "buffers.h"
 #include "rtos_tasks.h"
+#include "ansi.h"
 
 /**
  * @brief Processes a CAN Rx FIFO0 message callback.
@@ -31,7 +32,7 @@ void __callback__process_can_rx_fifo_callback(CAN_HandleTypeDef *hcan) {
 	if (next_write_index != g_isr_rx_buffer_read_index)
 	{
 		CAN_Rx_Packet *rx_packet = &g_isr_rx_buffer[g_isr_rx_buffer_write_index];
-		if (!get_rx_message_from_CAN_RX_FIFO0(hcan, &rx_packet))
+		if (!get_rx_message_from_CAN_RX_FIFO0(hcan, rx_packet))
 		{
 			log_message("%s: error processing rx can packet", __func__);
 			return;
@@ -44,7 +45,7 @@ void __callback__process_can_rx_fifo_callback(CAN_HandleTypeDef *hcan) {
 	}
 
 	// Signal the processing task
-	osThreadFlagsSet(can_processing_task_handle, 0x01);
+	//osThreadFlagsSet(can_processing_task_handle, 0x01);
 }
 
 void activate_can_bus_fifo_callbacks()

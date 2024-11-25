@@ -27,13 +27,10 @@
 #include <string.h>  // For memcpy
 #include <stdio.h> // for printf
 #include <stdbool.h> // for boolean support in c
+
 #include "config.h"
 #include "can_common.h"
 #include "device_configs.h"
-
-
-
-
 #include "log.h"
 #include "ui.h"
 #include "error.h"
@@ -42,9 +39,7 @@
 #include "utils.h"
 #include "system.h"
 #include "buffers.h"
-
-#include "ssd1306.h" // for OLED screen https://github.com/afiskon/stm32-ssd1306
-#include "ssd1306_fonts.h"
+#include "rtos_tasks.h"
 
 
 #ifdef IS_SIMULATOR
