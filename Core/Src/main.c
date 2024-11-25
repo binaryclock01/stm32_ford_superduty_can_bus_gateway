@@ -17,7 +17,6 @@
   */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
-#include <callbacks.h>
 #include "main.h"
 #include "cmsis_os.h"
 
@@ -40,17 +39,19 @@
 #include "system.h"
 #include "buffers.h"
 #include "rtos_tasks.h"
-
+#include "callbacks.h"
 
 #ifdef IS_SIMULATOR
 #include "sim.h"
 #endif // IS_SIMULATOR
+
 
 int _write(int file, char *data, int len) {
     // Use HAL_UART_Transmit to send data to UART2
     HAL_UART_Transmit(&huart2, (uint8_t *)data, len, HAL_MAX_DELAY);
     return len;
 }
+
 
 /* USER CODE END Includes */
 
@@ -83,7 +84,7 @@ UART_HandleTypeDef huart2;
 osThreadId_t CAN1_Rx_TaskHandle;
 const osThreadAttr_t CAN1_Rx_Task_attributes = {
   .name = "CAN1_Rx_Task",
-  .stack_size = 256 * 4,
+  .stack_size = 1020 * 4,
   .priority = (osPriority_t) osPriorityHigh,
 };
 /* Definitions for CAN2_Rx_Task */
@@ -638,9 +639,19 @@ void StartCAN1_Rx_Task(void *argument)
   /* Infinite loop */
   CAN_Packet *packet = NULL;
   for (;;) {
-		if (osMessageQueueGet(can_circular_buffer[QUEUE_RX_CAN1].queue_handle, &packet, NULL, osWaitForever) == osOK)
-			__rtos__StartCAN_Rx_Task(CAN_TRUCK, packet);
-		osDelay(1);
+      if (osMessageQueueGet(can_circular_buffer[QUEUE_RX_CAN1].queue_handle, &packet, NULL, osWaitForever) == osOK) {
+    	  //checkTaskStackUsage();
+          if (packet != NULL) {
+        	  uint32_t queue_length = osMessageQueueGetCount(can_circular_buffer[QUEUE_RX_CAN1].queue_handle);
+        	  char msg[255];
+        	  if (queue_length >= 10)
+        	  {
+        		  sprintf(msg, "Cannot queue CAN1 Rx - QueueHandle has %lu elements and it would overflow the buffer.\r\n", queue_length);
+        		  printf(msg);
+        	  }
+              __rtos__StartCAN_Rx_Task(CAN_TRUCK, packet);
+          }
+      }
   }
   /* USER CODE END 5 */
 }
@@ -704,7 +715,6 @@ void StartCAN1_Tx_Task(void *argument)
 /* USER CODE END Header_StartHousekeeping_Task */
 void StartHousekeeping_Task(void *argument)
 {
-  osThreadYield();
   /* USER CODE BEGIN StartHousekeeping_Task */
   for (;;) {
 	__rtos__log_task();
@@ -730,6 +740,7 @@ void StartHousekeeping_Task(void *argument)
 void StartCAN_Tx_Send_Requests(void *argument)
 {
   /* USER CODE BEGIN StartCAN_Tx_Send_Requests */
+#ifdef IS_SIMULATOR
   /* Infinite loop */
 	for (;;)
 	{
@@ -752,6 +763,9 @@ void StartCAN_Tx_Send_Requests(void *argument)
       osDelay(15000);
 	}
       //osThreadYield();
+#else
+	osThreadSuspend(osThreadGetId());
+#endif
   /* USER CODE END StartCAN_Tx_Send_Requests */
 }
 

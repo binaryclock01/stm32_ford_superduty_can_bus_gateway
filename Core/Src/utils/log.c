@@ -13,13 +13,16 @@
 #include <string.h>
 #include <stdarg.h>
 #include <inttypes.h>
+#include <stdlib.h>
 #include <stdio.h>
+
+#include "main.h"
+#include "FreeRTOS.h"  // For pvPortMalloc
 #include "log.h"
 #include "ansi.h"
 #include "error.h"
-#include "ansi.h"
-#include <stdlib.h>
-#include "FreeRTOS.h"  // For pvPortMalloc
+
+
 
 
 /* --------------------------------------------------------------------------
@@ -131,11 +134,12 @@ void log_message(const char *format, ...) {
     char buf[LOG_MESSAGE_MAX_LENGTH];
     char final_buf[LOG_MESSAGE_MAX_LENGTH];
 
+    /*
     // Acquire the mutex
     if (osMutexAcquire(log_buffer->mutex_id, osWaitForever) != osOK) {
         return; // Mutex acquisition failed, skip logging
     }
-
+*/
     // Check if the buffer is full
     if (log_buffer->count >= LOG_BUFFER_SIZE) {
         osMutexRelease(log_buffer->mutex_id); // Release the mutex
@@ -172,8 +176,9 @@ void log_message(const char *format, ...) {
     log_buffer->head = (log_buffer->head + 1) % LOG_BUFFER_SIZE;
     log_buffer->count++;
 
+
     // Release the mutex
-    osMutexRelease(log_buffer->mutex_id);
+ //   osMutexRelease(log_buffer->mutex_id);
 }
 
 
@@ -238,7 +243,7 @@ void log_transmitted_can_message(Circular_Queue_Types queue_num, uint64_t reques
 
 */
 
-void log_transmitted_can_message(Circular_Queue_Types queue_num, uint64_t request_id, uint8_t *TxData, uint8_t dlc) {
+void log_transmitted_can_message(Circular_Queue_Types queue_num, uint32_t request_id, uint8_t *TxData, uint8_t dlc) {
     if (queue_num < 0 || queue_num >= TOTAL_QUEUES) {
         log_message("Error: Invalid queue number.");
         return;

@@ -36,7 +36,7 @@ extern "C" {
  * @param pid Pointer to the CANDevicePID specifying the requested PID.
  * @param TxData Pointer to the data buffer where the payload will be stored.
  */
-void generate_can_tx_read_data_payload(CANDeviceConfig *device, CANDevicePID *pid, uint8_t *TxData);
+void generate_can_tx_read_data_payload(CANDeviceConfig *device, CANDevicePID *pid, CAN_Payload_Array *TxData);
 
 /**
  * @brief Retrieve the appropriate CAN standard ID for the given device and verb.

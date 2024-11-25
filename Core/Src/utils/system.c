@@ -8,6 +8,8 @@
 #include "core_cm4.h"
 #include "ansi.h"
 #include <stdio.h>
+#include "FreeRTOS.h"
+#include "task.h"
 
 void reset_system(void) {
     // Clean up dynamically allocated resources
@@ -28,3 +30,8 @@ void check_min_heap_usage(void) {
     printf("Minimum Free Heap Size Ever: " BWHT "%lu" CRESET " bytes\r\n", (unsigned long)min_heap);
 }
 
+void checkTaskStackUsage(void) {
+    UBaseType_t unusedStackWords = uxTaskGetStackHighWaterMark(NULL); // NULL for current task
+    log_message("* Unused stack space: " BWHT "%lu" CRESET " words (" BWHT "%lu " CRESET "bytes)\r\n", unusedStackWords, unusedStackWords * 4);
+
+}

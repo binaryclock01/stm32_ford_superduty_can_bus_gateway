@@ -7,6 +7,7 @@
 
 #include <stdio.h>
 
+#include "main.h"
 #include "can_common.h"
 #include "error.h"
 #include "buffers.h"

@@ -38,6 +38,7 @@ extern "C" {
    Function Declarations
    -------------------------------------------------------------------------- */
 
+void _process_can_rx_fifo_callback(CAN_HandleTypeDef *hcan);
 
 /**
  * @brief Process a received CAN packet.
@@ -71,7 +72,7 @@ void normalize_rx_hal_header(const CAN_RxHeaderTypeDef *hal_rx_header, CAN_Heade
  * @param packet Pointer to the CAN_Packet to store the received message.
  * @return true if the message was successfully retrieved, false otherwise.
  */
-bool get_rx_message_from_CAN_RX_FIFO0(CAN_HandleTypeDef *hcan, CAN_Rx_Packet *packet);
+bool get_rx_message_from_CAN_RX_FIFO0(CAN_HandleTypeDef *hcan, volatile CAN_Rx_Packet *packet);
 
 #ifdef __cplusplus
 }

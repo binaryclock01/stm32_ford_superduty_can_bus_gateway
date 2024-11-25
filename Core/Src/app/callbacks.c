@@ -25,27 +25,9 @@
  *
  * @param hcan Pointer to the CAN hardware instance (e.g., CAN1 or CAN2).
  */
-void __callback__process_can_rx_fifo_callback(CAN_HandleTypeDef *hcan) {
-	uint32_t next_write_index = (g_isr_rx_buffer_write_index + 1) % ISR_BUFFER_SIZE;
-
-	// Check for overflow
-	if (next_write_index != g_isr_rx_buffer_read_index)
-	{
-		CAN_Rx_Packet *rx_packet = &g_isr_rx_buffer[g_isr_rx_buffer_write_index];
-		if (!get_rx_message_from_CAN_RX_FIFO0(hcan, rx_packet))
-		{
-			log_message("%s: error processing rx can packet", __func__);
-			return;
-		}
-
-		g_isr_rx_buffer_write_index = next_write_index; // Commit the write
-
-	} else {
-		// Handle buffer overflow (optional)
-	}
-
-	// Signal the processing task
-	//osThreadFlagsSet(can_processing_task_handle, 0x01);
+void __callback__process_can_rx_fifo_callback(CAN_HandleTypeDef *hcan)
+{
+	_process_can_rx_fifo_callback(hcan);
 }
 
 void activate_can_bus_fifo_callbacks()

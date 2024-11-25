@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "main.h"
+#include "cmsis_os2.h"
 
 /**
  * @brief Converts a byte array to an integer (uint16_t, uint32_t, or uint64_t) in big-endian order.

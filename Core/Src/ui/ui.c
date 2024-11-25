@@ -23,8 +23,8 @@
 
 
 /* ---| DISPLAY VARIABLES |-------------------------------------------------------------------- */
-char screen_data[SCREEN_MAX_CHAR_LINES][SCREEN_MAX_CHAR_WIDTH];
-char screen_data_states[SCREEN_MAX_CHAR_LINES][SCREEN_MAX_CHAR_WIDTH];
+//char screen_data[SCREEN_MAX_CHAR_LINES][SCREEN_MAX_CHAR_WIDTH];
+//char screen_data_states[SCREEN_MAX_CHAR_LINES][SCREEN_MAX_CHAR_WIDTH];
 uint8_t screen_line = 0;
 
 
@@ -34,18 +34,20 @@ uint8_t screen_line = 0;
  * Resets the screen data and state buffers to empty, and sets the current
  * message line to the top of the message area.
  */
+/*
 void init_oled_data() {
     screen_line = 0; // Reset the current message line index
     memset(screen_data, 0, sizeof(screen_data));           // Clear message data buffer
     memset(screen_data_states, 0, sizeof(screen_data_states)); // Clear state data buffer
 }
-
+*/
 /**
  * @brief Scroll existing messages up by one line.
  *
  * Shifts all message lines up by one, making room for a new message at the bottom.
  * The last message line is cleared.
  */
+/*
 void scroll_messages() {
     // Shift all message lines upward
     for (int i = 0; i < MESSAGE_LINES - 1; i++) {
@@ -55,7 +57,7 @@ void scroll_messages() {
     // Clear the last message line
     memset(screen_data[STATE_LINES + MESSAGE_LINES - 1], 0, sizeof(screen_data[0]));
 }
-
+*/
 /**
  * @brief Send a message to the console and update the OLED display.
  *
@@ -64,6 +66,7 @@ void scroll_messages() {
  *
  * @param msg Pointer to the null-terminated message string to be displayed.
  */
+/*
 void send_console_msg(const char *msg) {
 
 	log_message(msg);
@@ -89,6 +92,7 @@ void send_console_msg(const char *msg) {
     screen_line++;
 #endif
 }
+*/
 /**
  * @brief Update the OLED screen with the current state data and messages.
  *
@@ -98,6 +102,7 @@ void send_console_msg(const char *msg) {
  *
  * @param can_instance The CAN instance (e.g., CAN_TRUCK or CAN_AUX) to display state data for.
  */
+/*
 void update_oled_status(CANInstance can_instance) {
     // Step 1: Update the state information for the specified CAN instance
     draw_screen_data_states(can_instance);
@@ -105,12 +110,14 @@ void update_oled_status(CANInstance can_instance) {
     // Step 2: Update the message display
     display_messages();
 }
+*/
 /**
  * @brief Display messages stored in the message buffer.
  *
  * Clears the message area of the OLED screen and writes all messages from
  * the buffer to the screen.
  */
+/*
 void display_messages() {
     // Clear the message display area (below the state area)
     ssd1306_FillRectangle(0, STATE_LINES * SCREEN_FONT_HEIGHT, SSD1306_WIDTH, SSD1306_HEIGHT, Black);
@@ -125,7 +132,7 @@ void display_messages() {
     // Apply changes to the OLED screen
     ssd1306_UpdateScreen();
 }
-
+*/
 /**
  * @brief Draw state data for the CAN instance on the OLED screen.
  *
@@ -134,6 +141,7 @@ void display_messages() {
  *
  * @param can_instance The CAN instance (e.g., CAN_TRUCK or CAN_AUX) to display data for.
  */
+/*
 void draw_screen_data_states(CANInstance can_instance) {
 
 
@@ -175,4 +183,4 @@ void draw_screen_data_states(CANInstance can_instance) {
     // Apply changes to the OLED screen
     ssd1306_UpdateScreen();
 }
-
+*/

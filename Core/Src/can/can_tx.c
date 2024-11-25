@@ -17,14 +17,18 @@
  */
 
 #include <stdio.h>
+#include <string.h>
 
 #include "can_tx.h"
 #include "can_common.h"
 #include "can_helper.h"
 #include "error.h"
+#include "log.h"
+#include "can_rx.h"
+#include "can_packet.h"
 
 
-void generate_can_tx_read_data_payload(CANDeviceConfig *device, CANDevicePID *pid, uint8_t *TxData) {
+void generate_can_tx_read_data_payload(CANDeviceConfig *device, CANDevicePID *pid, CAN_Payload_Array *TxData) {
     uint64_t request_payload = build_can_tx_read_data_request(device, pid); // Build the payload using custom logic
     request_payload = __builtin_bswap64(request_payload);      // Convert to big-endian if required
     memcpy(TxData, &request_payload, MAX_DLC_BYTE_LENGTH);     // Copy payload into TxData buffer
@@ -97,7 +101,7 @@ void send_can_packet_to_tx_queue(CANInstance can_instance, CANDeviceConfig *devi
     uint32_t verb_stdid = get_can_device_stdid(device, verb);
 
     // Step 5: Populate the CAN packet
-    generate_can_tx_read_data_payload(device, pid, packet->payload); // Generate the payload
+    generate_can_tx_read_data_payload(device, pid, &(packet->payload)); // Generate the payload
     packet->meta.can_instance = can_instance;                  // Set CAN instance
     packet->meta.timestamp = HAL_GetTick();                    // Capture the timestamp
     packet->flow = PACKET_TX;                                  // Mark as Tx packet

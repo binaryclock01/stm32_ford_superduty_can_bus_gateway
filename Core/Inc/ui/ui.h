@@ -28,16 +28,16 @@ extern "C" {
 #define SCREEN_FONT_WIDTH  6   /**< Font width in pixels (Font_6x8). */
 
 /* ---| DISPLAY CONSTANTS |-------------------------------------------------- */
-#define SCREEN_MAX_CHAR_LINES (SSD1306_HEIGHT / SCREEN_FONT_HEIGHT) /**< Max lines on screen height. */
-#define SCREEN_MAX_CHAR_WIDTH (SSD1306_WIDTH / SCREEN_FONT_WIDTH)   /**< Max chars on screen width. */
+//#define SCREEN_MAX_CHAR_LINES (SSD1306_HEIGHT / SCREEN_FONT_HEIGHT) /**< Max lines on screen height. */
+//#define SCREEN_MAX_CHAR_WIDTH (SSD1306_WIDTH / SCREEN_FONT_WIDTH)   /**< Max chars on screen width. */
 #define STATE_LINES 4           /**< Number of lines used for state info. */
-#define MESSAGE_LINES (SCREEN_MAX_CHAR_LINES - STATE_LINES) /**< Remaining lines for messages. */
+//#define MESSAGE_LINES (SCREEN_MAX_CHAR_LINES - STATE_LINES) /**< Remaining lines for messages. */
 #define DEFAULT_OLED_CAN_INSTANCE CAN_TRUCK // Default CAN instance for OLED updates
 
 //#define USE_SSD1306
 
-extern char screen_data[SCREEN_MAX_CHAR_LINES][SCREEN_MAX_CHAR_WIDTH];
-extern char screen_data_states[SCREEN_MAX_CHAR_LINES][SCREEN_MAX_CHAR_WIDTH];
+//extern char screen_data[SCREEN_MAX_CHAR_LINES][SCREEN_MAX_CHAR_WIDTH];
+//extern char screen_data_states[SCREEN_MAX_CHAR_LINES][SCREEN_MAX_CHAR_WIDTH];
 extern uint8_t screen_line;
 
 /* -----------------------------------------------------------------------------

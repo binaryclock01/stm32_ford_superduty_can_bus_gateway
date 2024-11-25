@@ -120,6 +120,7 @@ void flush_logs(void);
  * @param TxData Pointer to the payload data.
  * @param dlc Data length code.
  */
+// if you uncomment this, you have to try to include buffers.h.  I can't figure out why it gets all messed up. Just let it be implicit for now.
 //void log_transmitted_can_message(Circular_Queue_Types queue_num, uint64_t request_id, uint8_t *TxData, uint8_t dlc);
 
 /* --- Task Functions --- */

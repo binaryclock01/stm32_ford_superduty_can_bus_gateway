@@ -19,7 +19,7 @@
 
 void __rtos__StartCAN_Rx_Task(CANInstance enum_can_instance, CAN_Packet *packet)
 {
-	log_message(CRESET "* " BYEL "RTOS TASK CALL:" YEL "__rtos__StartCan_Rx_Task" CRESET);
+	//log_message(CRESET "* " BYEL "RTOS TASK CALL:" YEL "__rtos__StartCan_Rx_Task" CRESET);
 	Circular_Queue_Types queue_enum = QUEUE_TYPE_UNKNOWN;
 
 	// TODO: probably a better way to do this with enums and structs, but this is what it is for now.

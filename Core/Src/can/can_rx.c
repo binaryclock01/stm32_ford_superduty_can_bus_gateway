@@ -34,6 +34,9 @@
 #include "error.h"
 
 #include "can_helper.h"
+#include "can_tx.h"
+#include "can_core.h"
+
 
 void process_can_rx_packet(Circular_Queue_Types queue_enum, CANInstance can_instance_enum, CAN_Packet *packet) {
     // Step 1: Validate the input
@@ -43,7 +46,7 @@ void process_can_rx_packet(Circular_Queue_Types queue_enum, CANInstance can_inst
     }
 
     // Step 2: Log the raw CAN data for debugging
-    log_raw_can_packet(packet);
+    //log_raw_can_packet(packet);
 
     // Step 3: Check if the CAN message should be ignored
     if (should_ignore_message(packet->header.id)) {
@@ -54,6 +57,7 @@ void process_can_rx_packet(Circular_Queue_Types queue_enum, CANInstance can_inst
     Parsed_CAN_Data parsed_data;
     parse_raw_can_data(packet->payload, &parsed_data);
 
+    /*
     // Step 5: Validate the parsed data
     if (!validate_parsed_can_data(&parsed_data)) {
         char error_msg[64];
@@ -62,6 +66,7 @@ void process_can_rx_packet(Circular_Queue_Types queue_enum, CANInstance can_inst
         user_error_handler(ERROR_CAN_DATA_PARSE_FAILED, error_msg);
         return; // Exit early if the data is invalid
     }
+    */
 
     log_valid_can_data(&parsed_data);
 
@@ -138,7 +143,6 @@ void normalize_rx_hal_header(const CAN_RxHeaderTypeDef *hal_rx_header, CAN_Heade
     header->timestamp = hal_rx_header->Timestamp;
 }
 
-
 /**
  * @brief Retrieve a CAN message from FIFO0 and populate a CAN_Packet.
  *
@@ -151,7 +155,7 @@ void normalize_rx_hal_header(const CAN_RxHeaderTypeDef *hal_rx_header, CAN_Heade
  * @param packet Pointer to the `CAN_Packet` where the received message will be stored.
  * @return true if the message was successfully retrieved and valid, false otherwise.
  */
-bool get_rx_message_from_CAN_RX_FIFO0(CAN_HandleTypeDef *hcan, CAN_Rx_Packet *packet) {
+bool _get_rx_message_from_CAN_RX_FIFO0(CAN_HandleTypeDef *hcan, CANInstance can_instance, CAN_Packet *packet) {
     // Step 1: Validate `hcan`.
     if (hcan == NULL) {
         user_error_handler(ERROR_CAN_INVALID_CONTEXT, "NULL CAN_HandleTypeDef provided to get_rx_message_from_CAN_RX_FIFO0");
@@ -191,7 +195,6 @@ bool get_rx_message_from_CAN_RX_FIFO0(CAN_HandleTypeDef *hcan, CAN_Rx_Packet *pa
         return false;
     }
 
-    /*
     // Step 7: Translate the HAL Rx header into the unified CAN_Header format.
     normalize_rx_hal_header(&hal_rx_header, &packet->header);
 
@@ -199,10 +202,79 @@ bool get_rx_message_from_CAN_RX_FIFO0(CAN_HandleTypeDef *hcan, CAN_Rx_Packet *pa
     packet->flow = PACKET_RX;
     packet->meta.can_instance = can_instance;
     packet->meta.timestamp = HAL_GetTick();
-*/
+
     // Step 9: Log the raw CAN message for debugging.
     //log_raw_can_packet(packet);
 
     // Step 10: Return success.
     return true;
+}
+
+/**
+ * @brief Processes a CAN Rx FIFO0 message callback.
+ *
+ * This function is triggered when a CAN message is received in FIFO0.
+ * It identifies the associated CAN instance, allocates a packet from the memory pool,
+ * retrieves the CAN message, and enqueues it into the appropriate message queue.
+ * The responsibility for processing and freeing the packet lies with the task
+ * consuming the queue (e.g., StartCAN1_Rx_Task or StartCAN2_Rx_Task).
+ *
+ * @param hcan Pointer to the CAN hardware instance (e.g., CAN1 or CAN2).
+ */
+void _process_can_rx_fifo_callback(CAN_HandleTypeDef *hcan) {
+    // Step 1: Determine the CAN instance based on the provided CAN hardware handle
+    CANInstance can_instance = get_can_instance_from_hcan(hcan);
+    if (can_instance == CAN_TOTAL) {
+        // Log and exit if the CAN instance is invalid
+        user_error_handler(ERROR_CAN_MODULE_NOT_FOUND, "Unknown CAN instance in Rx FIFO callback");
+        return;
+    }
+
+    // Step 2: Retrieve the message queue for the corresponding CAN instance
+    osMessageQueueId_t target_queue = get_rx_queue_handle_from_hcan(hcan);
+    if (target_queue == NULL) {
+        // Log and exit if the target queue is unavailable
+        char error_msg[64];
+        snprintf(error_msg, sizeof(error_msg), "Message queue unavailable for CAN instance %d", can_instance);
+        user_error_handler(ERROR_CAN_INIT_FAILED, error_msg);
+        return;
+    }
+
+    Circular_Queue_Types queue_type = get_queue_num_by_can_instance(can_instance, QUEUE_TYPE_FLOW_RX);
+
+    // Step 3: Allocate a CAN packet from the memory pool
+    CAN_Packet *packet = _allocate_can_packet_on_circular_buffer(queue_type);
+
+    if (packet == NULL) {
+        // Log and exit if no free packet is available in the memory pool
+        char error_msg[64];
+        snprintf(error_msg, sizeof(error_msg), "No free packet in pool for CAN instance %d", can_instance);
+        user_error_handler(ERROR_CAN_BUFFER_OVERFLOW, error_msg);
+        return;
+    }
+
+    // Step 4: Retrieve the CAN message and populate the allocated packet
+    if (!_get_rx_message_from_CAN_RX_FIFO0(hcan, can_instance, packet)) {
+        // Free the packet and log the error if message retrieval fails
+        _free_can_packet_using_queue_type_from_circular_buffer(queue_type);
+        char error_msg[64];
+        snprintf(error_msg, sizeof(error_msg), "Failed to retrieve CAN message for CAN instance %d", can_instance);
+        user_error_handler(ERROR_CAN_RETRIEVE_FAILED, error_msg);
+        return;
+    }
+
+    // Step 5: Enqueue the packet into the message queue
+    if (osMessageQueuePut(target_queue, &packet, 0, 0) != osOK) {
+        // Free the packet and log the error if the queue is full or unavailable
+        _free_can_packet_using_queue_type_from_circular_buffer(queue_type);
+        char error_msg[64];
+        snprintf(error_msg, sizeof(error_msg), "Queue full for CAN instance %d", can_instance);
+        user_error_handler(ERROR_CAN_QUEUE_FULL, error_msg);
+        return;
+    }
+
+    // Note: Do NOT free the packet here!
+    // The osMessageQueuePut function only copies the pointer to the packet,
+    // not the packet data itself. The packet must remain valid for the
+    // consumer task (e.g., StartCAN1_Rx_Task) to process and free.
 }

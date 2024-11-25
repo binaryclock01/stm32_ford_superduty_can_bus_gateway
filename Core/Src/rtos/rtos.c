@@ -41,6 +41,8 @@ const osMessageQueueAttr_t CAN2_Tx_Queue_attributes = {
   .name = "CAN2_Tx_Queue"
 };
 
+osMessageQueueId_t g_can_rx_isr_queue = {0};
+
 void init_rtos_queue_handles(void)
 {
 	char buf[255];

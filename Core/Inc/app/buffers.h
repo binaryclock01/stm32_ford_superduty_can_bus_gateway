@@ -20,6 +20,7 @@ extern "C" {
 #include <stdbool.h>             // For boolean support
 #include "config.h"
 //#include "can_common.h"          // Common CAN utilities
+#include "can_packet.h"
 #include "rtos.h"                // RTOS utilities
 #include "log.h"                 // Logging utilities
 
@@ -119,7 +120,7 @@ bool _free_can_packet_using_queue_type_from_circular_buffer(Circular_Queue_Types
  * @param hcan Pointer to the CAN hardware handle.
  * @return osMessageQueueId_t* Pointer to the message queue handle, or NULL if not found.
  */
-osMessageQueueId_t *get_rx_queue_handle_from_hcan(CAN_HandleTypeDef *hcan);
+osMessageQueueId_t get_rx_queue_handle_from_hcan(CAN_HandleTypeDef *hcan);
 
 /**
  * @brief Processes the Rx ISR buffer for a given CAN instance.

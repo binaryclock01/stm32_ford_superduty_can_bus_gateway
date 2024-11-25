@@ -31,67 +31,21 @@ extern "C" {
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-// Add any additional includes here
+
 /* USER CODE END Includes */
 
 /* Exported types ------------------------------------------------------------*/
 /* USER CODE BEGIN ET */
-// Define any additional types here
+
 /* USER CODE END ET */
 
 /* Exported constants --------------------------------------------------------*/
 /* USER CODE BEGIN EC */
 
-// #define LOOPBACK_MODE
-
-#include "cmsis_os.h"        // RTOS CMSIS types, such as osMutedId_t
-//#include "device_configs.h"
-#include "buffers.h"
-//#include "can_common.h"
-#include "ssd1306_conf.h"
-//#include "rtos.h"
-
-
-/* ---| CAN TYPES CONSTANTS |------------------------------------------------ */
-
-//#define CAN_TRUCK 0
-//#define CAN_AUX   1
-//#define CAN_MAX   2
-
-/**
- * @brief CAN-related variables.
- */
-extern CAN_HandleTypeDef hcan1;
-extern CAN_HandleTypeDef hcan2;
-extern I2C_HandleTypeDef hi2c1;
-
-extern osMessageQueueId_t CAN1_Rx_QueueHandle;
-extern osMessageQueueId_t CAN2_Rx_QueueHandle;
-extern osMessageQueueId_t Tx_QueueHandle;
-
-extern UART_HandleTypeDef huart2;
-/**
- * @brief Display-related variables.
- */
-
-/**
- * @brief Time-related variables.
- */
-extern uint32_t last_can_request_time; /**< Last CAN request timestamp. */
-
 /* USER CODE END EC */
 
 /* Exported macro ------------------------------------------------------------*/
 /* USER CODE BEGIN EM */
-
-/**
- * @brief Check if a value is within a given range.
- * @param value The value to check.
- * @param min The minimum range value.
- * @param max The maximum range value.
- * @return True if value is in range, false otherwise.
- */
-#define IN_RANGE(value, min, max) ((value) >= (min) && (value) <= (max))
 
 /* USER CODE END EM */
 
@@ -99,13 +53,17 @@ extern uint32_t last_can_request_time; /**< Last CAN request timestamp. */
 void Error_Handler(void);
 
 /* USER CODE BEGIN EFP */
-// Add any additional exported function prototypes here
+
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
 
 /* USER CODE BEGIN Private defines */
-// Add any additional private defines here
+
+extern UART_HandleTypeDef huart2;
+extern CAN_HandleTypeDef hcan1;
+extern CAN_HandleTypeDef hcan2;
+
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus

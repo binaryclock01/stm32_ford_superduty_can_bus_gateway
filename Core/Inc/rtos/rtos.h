@@ -29,6 +29,8 @@ extern "C" {
    Global Variables
    -------------------------------------------------------------------------- */
 
+extern osMessageQueueId_t g_can_rx_isr_queue;
+
 /**
  * @brief Attributes for CAN1 Rx Queue.
  */
