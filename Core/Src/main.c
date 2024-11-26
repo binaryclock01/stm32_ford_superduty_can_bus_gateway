@@ -78,48 +78,49 @@ CRC_HandleTypeDef hcrc;
 
 I2C_HandleTypeDef hi2c1;
 
+UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart2;
 
 /* Definitions for CAN1_Rx_Task */
 osThreadId_t CAN1_Rx_TaskHandle;
 const osThreadAttr_t CAN1_Rx_Task_attributes = {
   .name = "CAN1_Rx_Task",
-  .stack_size = 1020 * 4,
+  .stack_size = 1024 * 4,
   .priority = (osPriority_t) osPriorityHigh,
 };
 /* Definitions for CAN2_Rx_Task */
 osThreadId_t CAN2_Rx_TaskHandle;
 const osThreadAttr_t CAN2_Rx_Task_attributes = {
   .name = "CAN2_Rx_Task",
-  .stack_size = 256 * 4,
+  .stack_size = 1024 * 4,
   .priority = (osPriority_t) osPriorityHigh,
 };
 /* Definitions for CAN1_Tx_Task */
 osThreadId_t CAN1_Tx_TaskHandle;
 const osThreadAttr_t CAN1_Tx_Task_attributes = {
   .name = "CAN1_Tx_Task",
-  .stack_size = 512 * 4,
+  .stack_size = 2048 * 4,
   .priority = (osPriority_t) osPriorityNormal,
 };
 /* Definitions for Housekeeping_Ta */
 osThreadId_t Housekeeping_TaHandle;
 const osThreadAttr_t Housekeeping_Ta_attributes = {
   .name = "Housekeeping_Ta",
-  .stack_size = 256 * 4,
+  .stack_size = 2048 * 4,
   .priority = (osPriority_t) osPriorityLow,
 };
 /* Definitions for CAN1_Send_Reque */
 osThreadId_t CAN1_Send_RequeHandle;
 const osThreadAttr_t CAN1_Send_Reque_attributes = {
   .name = "CAN1_Send_Reque",
-  .stack_size = 512 * 4,
+  .stack_size = 2048 * 4,
   .priority = (osPriority_t) osPriorityAboveNormal,
 };
 /* Definitions for CAN2_Tx_Task */
 osThreadId_t CAN2_Tx_TaskHandle;
 const osThreadAttr_t CAN2_Tx_Task_attributes = {
   .name = "CAN2_Tx_Task",
-  .stack_size = 256 * 4,
+  .stack_size = 1024 * 4,
   .priority = (osPriority_t) osPriorityNormal,
 };
 /* USER CODE BEGIN PV */
@@ -136,6 +137,7 @@ static void MX_I2C1_Init(void);
 static void MX_CAN2_Init(void);
 static void MX_CRC_Init(void);
 static void MX_USART2_UART_Init(void);
+static void MX_USART1_UART_Init(void);
 void StartCAN1_Rx_Task(void *argument);
 void StartCAN2_Rx_Task(void *argument);
 void StartCAN1_Tx_Task(void *argument);
@@ -217,6 +219,18 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan) {
     __callback__process_can_rx_fifo_callback(hcan);
 }
 
+uint8_t Cmd_End[3] = { 0xFF, 0xFF, 0xFF };
+
+void NEXTION_SendString (const char *id, const char *string)
+{
+	char buf[50];
+	uint8_t len = sprintf(buf, "%s.txt=\"%s\"", id, string);
+	HAL_UART_Transmit(&huart1, (uint8_t *)buf, len, 1000);
+	HAL_UART_Transmit(&huart1, Cmd_End, 3, 1000);
+
+
+}
+
 /* USER CODE END 0 */
 
 /**
@@ -255,7 +269,13 @@ int main(void)
   MX_CAN2_Init();
   MX_CRC_Init();
   MX_USART2_UART_Init();
+  MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
+
+  //bool sim_mode = is_sim_mode_enabled();
+
+  NEXTION_SendString("t0", "Hello");
+  NEXTION_SendString("t1", "World!");
 
   send_clear_screen_ansi_code();
 
@@ -555,6 +575,39 @@ static void MX_I2C1_Init(void)
 }
 
 /**
+  * @brief USART1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_USART1_UART_Init(void)
+{
+
+  /* USER CODE BEGIN USART1_Init 0 */
+
+  /* USER CODE END USART1_Init 0 */
+
+  /* USER CODE BEGIN USART1_Init 1 */
+
+  /* USER CODE END USART1_Init 1 */
+  huart1.Instance = USART1;
+  huart1.Init.BaudRate = 9600;
+  huart1.Init.WordLength = UART_WORDLENGTH_8B;
+  huart1.Init.StopBits = UART_STOPBITS_1;
+  huart1.Init.Parity = UART_PARITY_NONE;
+  huart1.Init.Mode = UART_MODE_TX_RX;
+  huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart1.Init.OverSampling = UART_OVERSAMPLING_16;
+  if (HAL_UART_Init(&huart1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN USART1_Init 2 */
+
+  /* USER CODE END USART1_Init 2 */
+
+}
+
+/**
   * @brief USART2 Initialization Function
   * @param None
   * @retval None
@@ -639,6 +692,8 @@ void StartCAN1_Rx_Task(void *argument)
   /* Infinite loop */
   CAN_Packet *packet = NULL;
   for (;;) {
+	  osDelay(1000);
+	  /*
       if (osMessageQueueGet(can_circular_buffer[QUEUE_RX_CAN1].queue_handle, &packet, NULL, osWaitForever) == osOK) {
     	  //checkTaskStackUsage();
           if (packet != NULL) {
@@ -652,6 +707,7 @@ void StartCAN1_Rx_Task(void *argument)
               __rtos__StartCAN_Rx_Task(CAN_TRUCK, packet);
           }
       }
+      */
   }
   /* USER CODE END 5 */
 }
@@ -695,6 +751,7 @@ void StartCAN1_Tx_Task(void *argument)
 
   for(;;)
   {
+//	  osThreadSuspend(osThreadGetId());
      CAN_Packet *packet = NULL;
      if (osMessageQueueGet(can_circular_buffer[QUEUE_TX_CAN1].queue_handle, &packet, NULL, osWaitForever) == osOK)
     	 __rtos__StartCAN_Tx_Task(CAN_TRUCK, packet);
@@ -722,10 +779,6 @@ void StartHousekeeping_Task(void *argument)
 	// Yield to other threads without a fixed delay
 	//osThreadYield();
 	  //osThreadSuspend(osThreadGetId());
-#ifdef USE_SSD1306
-	  // Step 1: Update OLED display for the specified CAN instance
-      //update_oled_status(DEFAULT_OLED_CAN_INSTANCE);
-#endif
   }
   /* USER CODE END StartHousekeeping_Task */
 }
@@ -740,10 +793,13 @@ void StartHousekeeping_Task(void *argument)
 void StartCAN_Tx_Send_Requests(void *argument)
 {
   /* USER CODE BEGIN StartCAN_Tx_Send_Requests */
-#ifdef IS_SIMULATOR
-  /* Infinite loop */
+//#ifdef IS_SIMULATOR
+//	osThreadSuspend(osThreadGetId());
+//#else
+	/* Infinite loop */
 	for (;;)
 	{
+	  checkTaskStackUsage();
 	  uint32_t queue_length = osMessageQueueGetCount(can_circular_buffer[QUEUE_TX_CAN1].queue_handle);
 	  char msg[255];
 	  if (queue_length >= 7)
@@ -758,14 +814,10 @@ void StartCAN_Tx_Send_Requests(void *argument)
 			flush_logs();
 			send_all_requests();
 	  }
-
-      osThreadYield();
       osDelay(15000);
 	}
       //osThreadYield();
-#else
-	osThreadSuspend(osThreadGetId());
-#endif
+//#endif
   /* USER CODE END StartCAN_Tx_Send_Requests */
 }
 

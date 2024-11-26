@@ -7,12 +7,37 @@
 
 // only load this file if in the SIMULATOR mode
 
+#include <stdbool.h>
+#include <stdio.h>
+
 #include "sim.h"
 #include "config.h"
 #include "device_configs.h"
 #include "can_core.h"
+
 #include "log.h"
 
+/*
+bool isSimulator() {
+    return isSimulatorMode; // Returns the pre-determined value
+}
+*/
+
+/*
+bool is_sim_mode_enabled(void)
+{
+	if (HAL_GPIO_ReadPin(SIM_MODE_GPIO_Port, SIM_MODE_Pin) == GPIO_PIN_RESET) {
+	    // Pin is LOW (pulled down to GND)
+	    printf("SIM_MODE_Pin is pulled down (LOW)\n");
+	    return true;
+	} else {
+	    // Pin is HIGH (default pull-up state)
+	    printf("SIM_MODE_Pin is in pull-up state (HIGH)\n");
+	    return false;
+	}
+	return false;
+}
+*/
 #ifdef IS_SIMULATOR
 
 _SIM_Turn_Signal_States __sim__g_turn_signal_states = {

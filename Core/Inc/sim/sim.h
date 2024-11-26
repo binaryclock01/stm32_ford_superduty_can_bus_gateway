@@ -40,7 +40,7 @@ extern _SIM_Turn_Signal_States __sim__g_turn_signal_states;
 // this is used in void multiplex_turn_signal_states()
 #define TURN_SIGNAL_COUNT 4
 
-
+bool is_sim_mode_enabled(void);
 void __sim__generate_packet_response_from_truck(CANDevicePID *device_pid, CAN_Command command);
 void __sim__initialize_states_mapping_array();
 

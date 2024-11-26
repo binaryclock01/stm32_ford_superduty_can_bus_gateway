@@ -17,7 +17,6 @@
 #include "log.h"
 
 #include "can_common.h"
-#include "ssd1306_fonts.h"
 #include "utils.h"
 
 

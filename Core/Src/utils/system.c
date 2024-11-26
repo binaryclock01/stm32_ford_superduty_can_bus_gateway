@@ -33,5 +33,6 @@ void check_min_heap_usage(void) {
 void checkTaskStackUsage(void) {
     UBaseType_t unusedStackWords = uxTaskGetStackHighWaterMark(NULL); // NULL for current task
     log_message("* Unused stack space: " BWHT "%lu" CRESET " words (" BWHT "%lu " CRESET "bytes)\r\n", unusedStackWords, unusedStackWords * 4);
+    flush_logs();
 
 }

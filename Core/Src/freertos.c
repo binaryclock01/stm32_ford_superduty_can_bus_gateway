@@ -24,7 +24,8 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include <stdio.h>
+#include "ansi.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -51,6 +52,29 @@
 /* USER CODE BEGIN FunctionPrototypes */
 
 /* USER CODE END FunctionPrototypes */
+
+/* Hook prototypes */
+void vApplicationStackOverflowHook(xTaskHandle xTask, signed char *pcTaskName);
+
+/* USER CODE BEGIN 4 */
+void vApplicationStackOverflowHook(xTaskHandle xTask, signed char *pcTaskName)
+{
+    printf("* " BRED "Stack Overflow detected!" CRESET "\r\n");
+    printf("  - " BRED "Task Name: " BWHT "%s\r\n", pcTaskName);
+
+    // Retrieve additional task information
+    UBaseType_t stackHighWaterMark = uxTaskGetStackHighWaterMark(xTask);
+    printf("  - Remaining Stack Space (words): " BWHT "%lu\r\n", (unsigned long)stackHighWaterMark);
+   /* Run time stack overflow checking is performed if
+   configCHECK_FOR_STACK_OVERFLOW is defined to 1 or 2. This hook function is
+   called if a stack overflow is detected. */
+
+    // Optional: halt the system for debugging
+    while (1) {
+        __NOP(); // Infinite loop for debugging
+    }
+}
+/* USER CODE END 4 */
 
 /* Private application code --------------------------------------------------*/
 /* USER CODE BEGIN Application */
