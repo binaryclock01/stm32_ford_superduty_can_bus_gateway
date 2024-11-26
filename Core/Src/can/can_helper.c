@@ -14,7 +14,7 @@
 #include "can_packet.h"
 #include "device_configs.h"
 
-/**
+/** "Unknown CAN"
  * @brief Retrieves the CAN instance for the given hardware instance.
  *
  * @param hcan Pointer to the CAN hardware instance (e.g., CAN1 or CAN2).

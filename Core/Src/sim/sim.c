@@ -5,16 +5,21 @@
  *      Author: Ryan
  */
 
+// need to at least include config.h to check for IS_SIMULATOR define
+#include "config.h"
 // only load this file if in the SIMULATOR mode
+#ifdef IS_SIMULATOR
 
 #include <stdbool.h>
 #include <stdio.h>
+#include <stdint.h>
 
+#include "buffers.h"
 #include "sim.h"
-#include "config.h"
+#include "hid.h"
 #include "device_configs.h"
 #include "can_core.h"
-
+#include "ansi.h"
 #include "log.h"
 
 /*
@@ -38,7 +43,16 @@ bool is_sim_mode_enabled(void)
 	return false;
 }
 */
-#ifdef IS_SIMULATOR
+
+bool _g_sim_brake_on = false;
+bool _g_sim_hazards_on = false;
+bool _g_sim_reverse_on = false;
+bool _g_sim_left_turn_on = false;
+bool _g_sim_right_turn_on = false;
+bool _g_sim_left_change_on = false;
+bool _g_sim_right_change_on = false;
+
+
 
 _SIM_Turn_Signal_States __sim__g_turn_signal_states = {
     .turn_left_state = 1,  // Example: Left turn active
@@ -98,17 +112,28 @@ uint8_t multiplex_turn_signal_states(_SIM_Turn_Signal_States *turn_signal_states
  * @param device_pid Pointer to the `CANDevicePID` structure representing the PID to process.
  * @param command The command type (e.g., REQ_READ) to process.
  */
-void __sim__generate_packet_response_from_truck(CANDevicePID *device_pid, CAN_Command command) {
-    switch (command) {
-        case REQ_READ: // Process Read Data by Identifier
-            switch (device_pid->state_generation_type) {
+void __sim__generate_packet_response_from_truck(CANDevicePID *device_pid, CAN_Command command)
+{
+	CANCommands *request_command = get_can_request_command(command);
 
+	if (request_command == NULL)
+	{
+        log_message("Unknown CAN command: 0x%02X\n", command);
+        return;
+	}
+
+    switch (request_command->byte)
+    {
+        case REQ_READ_VALUE: // Process Read Data by Identifier
+        	log_message("* CAN Command Received: " BWHT "%02X" CRESET ": " BWHT "%s" CRESET, request_command->byte, request_command->name);
+            switch (device_pid->state_generation_type)
+            {
                 case CAN_STATE_GENERATION_NON_MULTIPLEXED_BYTE:
                     // Single signal logic for non-multiplexed byte generation
                     if (device_pid->num_of_signals == 1) {
                         // Check the single signal's state
                         bool is_state_on = is_signal_on(&device_pid->signals[0]);
-                        log_message("State is %s\n", is_state_on ? "ON" : "OFF");
+                        log_message("* State of " BWHT "%s " CRESET "is: " BWHT "%s" CRESET, device_pid->name, is_state_on ? "ON" : "OFF");
                     }
                     break;
 
@@ -156,23 +181,20 @@ void __sim__generate_packet_response_from_truck(CANDevicePID *device_pid, CAN_Co
                     }
 
                     // Output the computed multiplexed byte
-                    log_message("Multiplexed Byte: 0x%02X\n", multiplexed_byte);
+                    log_message("* State of " BWHT "%s " CRESET "is: " BWHT "%08X" CRESET, device_pid->name, multiplexed_byte);
                 } break;
 
                 default:
-                    log_message("Unknown state generation type.\n");
+                    log_message("* " RED "Unknown state generation type." CRESET);
                     break;
             }
             break;
 
         default:
-            log_message("Unknown CAN command.\n");
+            log_message("* " RED "CAN Command not implemented for response: " BWHT "0x%02X" CRESET ": " BWHT "%s" CRESET, command, request_command->name);
             break;
     }
 }
-
-
-
 
 
 #endif /* IS_SIMULATOR */

@@ -16,27 +16,22 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+#include "config.h"
 #include "main.h"
-#include "FreeRTOS.h"  // For pvPortMalloc
+#include "buffers.h"
 #include "log.h"
 #include "ansi.h"
 #include "error.h"
-
-
-
 
 /* --------------------------------------------------------------------------
    Global Variables
    -------------------------------------------------------------------------- */
 
-// Circular buffer for storing log messages
-//LogBuffer log_buffer = { .head = 0, .tail = 0, .count = 0 };
-LogBuffer *log_buffer_global_ptr = NULL; // Global pointer to heap-allocated log buffer
+// Global buffer for log buffer is in buffers.c
 
 /* --------------------------------------------------------------------------
    Initialization Functions
    -------------------------------------------------------------------------- */
-
 
 /**
  * @brief Initialize the logging system.
@@ -47,7 +42,11 @@ LogBuffer *log_buffer_global_ptr = NULL; // Global pointer to heap-allocated log
 void init_log_system(void) {
 	// log_buffer_global_ptr is a global pointer that is populated with the address of the
 	// log buffer that is allocated in the heap from create_log_buffer__heap__
+
     bool log_buffer_create_success = create_log_buffer__heap__();
+
+    LogBuffer *log_buffer_global_ptr = get_log_buffer_global_ptr();
+
 	if (!log_buffer_create_success || (log_buffer_global_ptr == NULL)) {
 		user_error_handler(ERROR_RTOS_MUTEX_INIT_FAILED, "Failed to initialize log mutex");
 		return;
@@ -65,49 +64,13 @@ void init_log_system(void) {
 
 // Use pvPortMalloc to create this buffer in the heap instead of static
 bool create_log_buffer__heap__(void) {
-    // Allocate memory for the LogBuffer structure
-	log_buffer_global_ptr = (LogBuffer *)pvPortMalloc(sizeof(LogBuffer));
-    if (log_buffer_global_ptr == NULL) {
-        user_error_handler(ERROR_HEAP_CREATE_LOG_BUFFER, "Failed to allocate memory for log buffer structure!");
-        return false; // Allocation failed
-    }
-
-    // Initialize the structure
-    log_buffer_global_ptr->head = 0;
-    log_buffer_global_ptr->tail = 0;
-    log_buffer_global_ptr->count = 0;
-
-    // Allocate memory for the messages array
-    log_buffer_global_ptr->messages = (char (*)[LOG_MESSAGE_MAX_LENGTH])pvPortMalloc(LOG_BUFFER_SIZE * LOG_MESSAGE_MAX_LENGTH);
-    if (log_buffer_global_ptr->messages == NULL) {
-        log_message("Failed to allocate memory for log messages array!");
-        vPortFree(log_buffer_global_ptr); // Free the structure if array allocation fails
-        return false;
-    }
-
-    // Initialize the mutex for thread-safe access
-    log_buffer_global_ptr->mutex_id = osMutexNew(NULL);
-    if (log_buffer_global_ptr->mutex_id == NULL) {
-        log_message("Failed to create mutex for log buffer!");
-        vPortFree(log_buffer_global_ptr->messages); // Free the array
-        vPortFree(log_buffer_global_ptr);           // Free the structure
-        return false;
-    }
-    return true;
+	// call the function in buffers.c
+	return __buffers__create_log_buffer__heap__();
 }
 
-
 void destroy_log_buffer__heap__() {
-	// log_buffer_global_ptr is a global pointer, pointing to the log buffer created in the heap
-    if (log_buffer_global_ptr != NULL) {
-        if (log_buffer_global_ptr->mutex_id != NULL) {
-            osMutexDelete(log_buffer_global_ptr->mutex_id); // Delete the mutex
-        }
-        if (log_buffer_global_ptr->messages != NULL) {
-            vPortFree(log_buffer_global_ptr->messages); // Free the messages array
-        }
-        vPortFree(log_buffer_global_ptr); // Free the structure itself
-    }
+	// call the function in buffers.c
+	__buffers_destroy_log_buffer__heap__();
 }
 
 /* --------------------------------------------------------------------------
@@ -124,49 +87,51 @@ void destroy_log_buffer__heap__() {
  * @param ... Variable arguments for the format string.
  */
 void log_message(const char *format, ...) {
-	LogBuffer *log_buffer = get_log_buffer_global_ptr();
-	if (log_buffer == NULL)
-	{
-		user_error_handler(ERROR_HEAP_LOG_BUFFER_NULL, "Error thrown from: __func__");
-		return;
-	}
+    LogBuffer *log_buffer = get_log_buffer_global_ptr();
+    if (log_buffer == NULL) {
+        user_error_handler(ERROR_HEAP_LOG_BUFFER_NULL, "Error thrown from: __func__");
+        return;
+    }
 
     char buf[LOG_MESSAGE_MAX_LENGTH];
     char final_buf[LOG_MESSAGE_MAX_LENGTH];
 
-    /*
-    // Acquire the mutex
-    if (osMutexAcquire(log_buffer->mutex_id, osWaitForever) != osOK) {
-        return; // Mutex acquisition failed, skip logging
-    }
-*/
-    // Check if the buffer is full
-    if (log_buffer->count >= LOG_BUFFER_SIZE) {
-        osMutexRelease(log_buffer->mutex_id); // Release the mutex
-        return; // Buffer is full, drop the log message
-    }
+    // Calculate the space available in `final_buf` after accounting for ANSI codes
+    size_t ansi_overhead = strlen(YEL) + strlen(CRESET) + strlen("SIM: ");
+    size_t max_buf_length = LOG_MESSAGE_MAX_LENGTH - ansi_overhead - 1; // -1 for null terminator
 
     // Prepare the log message
     va_list args;
     va_start(args, format);
 
 #ifdef USE_ANSI
-    vsnprintf(buf, sizeof(buf), format, args);
+    int buf_len = vsnprintf(buf, max_buf_length, format, args); // Use only the calculated space
 #else
     // Strip ANSI codes when USE_ANSI is not defined
     char stripped_buf[LOG_MESSAGE_MAX_LENGTH];
-    vsnprintf(stripped_buf, sizeof(stripped_buf), format, args);
+    int buf_len = vsnprintf(stripped_buf, max_buf_length, format, args);
     strip_ansi_codes(buf, stripped_buf, sizeof(buf)); // Function to remove ANSI codes
 #endif
 
     va_end(args);
 
+    // Check for truncation in `buf`
+    if (buf_len >= max_buf_length) {
+        snprintf(buf + max_buf_length - 20, 20, "...[TRUNCATED]"); // Append a truncation marker
+        buf[max_buf_length - 1] = '\0'; // Ensure null-termination
+    }
+
 #ifdef IS_SIMULATOR
-    snprintf(final_buf, sizeof(final_buf), YEL "SIM: " CRESET "%s", buf);
+    int final_len = snprintf(final_buf, sizeof(final_buf), "%sSIM: %s%s", YEL, buf, CRESET);
 #else
-    strncpy(final_buf, buf, sizeof(final_buf) - 1);
-    final_buf[sizeof(final_buf) - 1] = '\0'; // Null-terminate
+    int final_len = snprintf(final_buf, sizeof(final_buf), "%s", buf);
 #endif
+
+    // Check for truncation in `final_buf`
+    if (final_len >= LOG_MESSAGE_MAX_LENGTH) {
+        snprintf(final_buf + LOG_MESSAGE_MAX_LENGTH - 20, 20, "...[TRUNCATED]"); // Append a truncation marker
+        final_buf[LOG_MESSAGE_MAX_LENGTH - 1] = '\0'; // Ensure null-termination
+    }
 
     // Copy the message into the circular buffer
     strncpy(log_buffer->messages[log_buffer->head], final_buf, LOG_MESSAGE_MAX_LENGTH - 1);
@@ -175,10 +140,6 @@ void log_message(const char *format, ...) {
     // Update the buffer state
     log_buffer->head = (log_buffer->head + 1) % LOG_BUFFER_SIZE;
     log_buffer->count++;
-
-
-    // Release the mutex
- //   osMutexRelease(log_buffer->mutex_id);
 }
 
 
@@ -235,13 +196,6 @@ void log_status_message(const char *message, bool is_success) {
  * @param TxData Pointer to the payload data.
  * @param dlc Data length code.
  */
-
-/*
-void log_transmitted_can_message(Circular_Queue_Types queue_num, uint64_t request_id, uint8_t *TxData, uint8_t dlc) {
-	printf("it worked\n\r");
-}
-
-*/
 
 void log_transmitted_can_message(Circular_Queue_Types queue_num, uint32_t request_id, uint8_t *TxData, uint8_t dlc) {
     if (queue_num < 0 || queue_num >= TOTAL_QUEUES) {
@@ -398,10 +352,7 @@ void log_valid_can_data(const Parsed_CAN_Data *parsed_data) {
    Logging Task
    -------------------------------------------------------------------------- */
 
-LogBuffer *get_log_buffer_global_ptr()
-{
-	return (LogBuffer *)log_buffer_global_ptr;
-}
+
 
 void _process_one_log_message()
 {
@@ -451,40 +402,6 @@ void _process_one_log_message()
 void __rtos__log_task(void) {
 
     _process_one_log_message();
-}
-
-void report_log_buffer_fullness(void) {
-	LogBuffer *buffer = get_log_buffer_global_ptr();
-	if (buffer == NULL) {
-        printf("Log buffer is not initialized.\n");
-        return;
-    }
-
-    printf("* Log buffer fullness:\n");
-    printf("  - Messages in buffer: " BWHT "%d" CRESET " / " BWHT "%d" CRESET "\r\n", buffer->count, LOG_BUFFER_SIZE);
-    printf("  - Percent full: " BWHT "%.2f%%" CRESET "\r\n", (buffer->count / (float)LOG_BUFFER_SIZE) * 100.0);
-}
-
-
-void report_log_buffer_heap_size(void) {
-	LogBuffer *buffer = get_log_buffer_global_ptr();
-	if (buffer == NULL) {
-        printf("Log buffer is not initialized.\n");
-        return;
-    }
-
-    uint32_t structure_size = sizeof(LogBuffer);
-    uint32_t messages_size = LOG_BUFFER_SIZE * LOG_MESSAGE_MAX_LENGTH;
-    uint32_t total_size = structure_size + messages_size;
-
-    char buf[255];
-    log_message("* Log buffer HEAP usage:");
-    sprintf(buf, "  - Structure size: " BWHT "%lu " CRESET "bytes", structure_size);
-    log_message(buf);
-    sprintf(buf, "  - Messages array size: " BWHT "%lu " CRESET "bytes", messages_size);
-    log_message(buf);
-    sprintf(buf, "  - Total size: " BWHT "%lu " CRESET "bytes", total_size);
-    log_message(buf);
 }
 
 /**

@@ -26,6 +26,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 
+#include "config.h"
 #include "buffers.h"
 #include "can_rx.h"
 
@@ -36,6 +37,10 @@
 #include "can_helper.h"
 #include "can_tx.h"
 #include "can_core.h"
+
+#ifdef IS_SIMULATOR
+#include "sim.h"
+#endif
 
 
 void process_can_rx_packet(Circular_Queue_Types queue_enum, CANInstance can_instance_enum, CAN_Packet *packet) {

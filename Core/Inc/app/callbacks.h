@@ -17,6 +17,10 @@ extern "C" {
 #endif
 
 #include <stdint.h>              // For fixed-width integer types
+#include "config.h"
+#include "main.h"
+#include "cmsis_os.h"
+
 #include "rtos.h"                // RTOS utilities
 #include "can_common.h"          // Common CAN utilities
 #include "log.h"                 // Logging utilities

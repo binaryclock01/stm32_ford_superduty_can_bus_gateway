@@ -107,41 +107,41 @@ CANDeviceConfig can_devices[CAN_DEVICE_COUNT] = {
     { .device_name = "SCCM", .id.request = CAN_ID_SCCM_REQUEST, .id.response = CAN_ID_SCCM_REPLY, .pids = sccm_pids, .pid_count = SCCM_PID_COUNT }
 };
 
-// Command Definitions
 CANCommands can_request_commands[] = {
-    { .byte = 0x10, .name = "Diagnostic Session Control", .short_name = "Diag" },
-    { .byte = 0x11, .name = "ECU Reset", .short_name = "Reset" },
-    { .byte = 0x14, .name = "Clear Diagnostic Information", .short_name = "Clear" },
-    { .byte = 0x19, .name = "Read DTC Information", .short_name = "DTC" },
-    { .byte = 0x22, .name = "Read Data by Identifier", .short_name = "Read" },
-    { .byte = 0x27, .name = "Security Access", .short_name = "SecAcc" },
-    { .byte = 0x28, .name = "Communication Control", .short_name = "CommCtrl" },
-    { .byte = 0x2E, .name = "Write Data by Identifier", .short_name = "Write" },
-    { .byte = 0x31, .name = "Routine Control", .short_name = "Routine" },
-    { .byte = 0x34, .name = "Request Download", .short_name = "Download" },
-    { .byte = 0x35, .name = "Request Upload", .short_name = "Upload" },
-    { .byte = 0x36, .name = "Transfer Data", .short_name = "Transfer" },
-    { .byte = 0x37, .name = "Request Transfer Exit", .short_name = "ExitTrans" },
-    { .byte = 0x3E, .name = "Tester Present", .short_name = "Tester" },
-    { .byte = 0x7F, .name = "Negative Response", .short_name = "NegResp" }
+    { .byte = REQ_DIAG_SESS_VALUE,    .name = "Diagnostic Session Control",    .short_name = "Diag"       },
+    { .byte = REQ_ECU_RESET_VALUE,    .name = "ECU Reset",                     .short_name = "Reset"      },
+    { .byte = REQ_CLR_DIAG_VALUE,     .name = "Clear Diagnostic Information",  .short_name = "Clear"      },
+    { .byte = REQ_DTC_VALUE,          .name = "Read DTC Information",          .short_name = "DTC"        },
+    { .byte = REQ_READ_VALUE,         .name = "Read Data by Identifier",       .short_name = "Read"       },
+    { .byte = REQ_SEC_ACC_VALUE,      .name = "Security Access",               .short_name = "SecAcc"     },
+    { .byte = REQ_COMM_CTRL_VALUE,    .name = "Communication Control",         .short_name = "CommCtrl"   },
+    { .byte = REQ_WRITE_VALUE,        .name = "Write Data by Identifier",      .short_name = "Write"      },
+    { .byte = REQ_ROUTINE_VALUE,      .name = "Routine Control",               .short_name = "Routine"    },
+    { .byte = REQ_DOWNLOAD_VALUE,     .name = "Request Download",              .short_name = "Download"   },
+    { .byte = REQ_UPLOAD_VALUE,       .name = "Request Upload",                .short_name = "Upload"     },
+    { .byte = REQ_XFER_DATA_VALUE,    .name = "Transfer Data",                 .short_name = "Transfer"   },
+    { .byte = REQ_XFER_EXIT_VALUE,    .name = "Request Transfer Exit",         .short_name = "ExitTrans"  },
+    { .byte = REQ_TESTER_VALUE,       .name = "Tester Present",                .short_name = "Tester"     }
 };
 
+
 CANCommands can_response_commands[] = {
-    { .byte = 0x50, .name = "Response: Diagnostic Session Control", .short_name = "Diag Sess" },
-    { .byte = 0x51, .name = "Response: ECU Reset", .short_name = "Resp ECU Reset" },
-    { .byte = 0x54, .name = "Response: Clear Diagnostic Information", .short_name = "Resp Clr Diag" },
-    { .byte = 0x59, .name = "Response: Read DTC Information", .short_name = "Resp DTC" },
-    { .byte = 0x62, .name = "Response: Read Data By Identifier", .short_name = "Read Resp" },
-    { .byte = 0x67, .name = "Response: Security Access", .short_name = "Resp Sec Acc" },
-    { .byte = 0x68, .name = "Response: Communication Control", .short_name = "Resp Comm Ctl" },
-    { .byte = 0x6E, .name = "Response: Write Data By Identifier", .short_name = "Write Resp" },
-    { .byte = 0x71, .name = "Response: Routine Control", .short_name = "Resp Routine" },
-    { .byte = 0x74, .name = "Response: Request Download", .short_name = "Resp Download" },
-    { .byte = 0x76, .name = "Response: Transfer Data", .short_name = "Resp Xfer Data" },
-    { .byte = 0x77, .name = "Response: Request Transfer Exit", .short_name = "Resp Xfer Exit" },
-    { .byte = 0x7E, .name = "Response: Tester Present", .short_name = "Resp Tester" },
-    { .byte = 0x7F, .name = "Negative Response", .short_name = "Resp Neg" }
+    { .byte = RESP_DIAG_SESS_VALUE,    .name = "Response: Diagnostic Session Control",    .short_name = "Diag Sess"      },
+    { .byte = RESP_ECU_RESET_VALUE,    .name = "Response: ECU Reset",                     .short_name = "Resp ECU Reset" },
+    { .byte = RESP_CLR_DIAG_VALUE,     .name = "Response: Clear Diagnostic Information",  .short_name = "Resp Clr Diag"  },
+    { .byte = RESP_DTC_VALUE,          .name = "Response: Read DTC Information",          .short_name = "Resp DTC"       },
+    { .byte = RESP_READ_VALUE,         .name = "Response: Read Data By Identifier",       .short_name = "Read Resp"      },
+    { .byte = RESP_SEC_ACC_VALUE,      .name = "Response: Security Access",               .short_name = "Resp Sec Acc"   },
+    { .byte = RESP_COMM_CTRL_VALUE,    .name = "Response: Communication Control",         .short_name = "Resp Comm Ctl"  },
+    { .byte = RESP_WRITE_VALUE,        .name = "Response: Write Data By Identifier",      .short_name = "Write Resp"     },
+    { .byte = RESP_ROUTINE_VALUE,      .name = "Response: Routine Control",               .short_name = "Resp Routine"   },
+    { .byte = RESP_DOWNLOAD_VALUE,     .name = "Response: Request Download",              .short_name = "Resp Download"  },
+    { .byte = RESP_XFER_DATA_VALUE,    .name = "Response: Transfer Data",                 .short_name = "Resp Xfer Data" },
+    { .byte = RESP_XFER_EXIT_VALUE,    .name = "Response: Request Transfer Exit",         .short_name = "Resp Xfer Exit" },
+    { .byte = RESP_TESTER_VALUE,       .name = "Response: Tester Present",                .short_name = "Resp Tester"    },
+    { .byte = RESP_NEG_VALUE,          .name = "Negative Response",                       .short_name = "Resp Neg"       }
 };
+
 
 CANCommands *get_can_request_command(uint8_t can_cmd_byte) {
     // Determine the size of the can_request_commands array

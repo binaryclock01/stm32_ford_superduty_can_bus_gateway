@@ -200,6 +200,23 @@ typedef enum {
 } CAN_Request_Command_Index;
 
 typedef enum {
+    REQ_DIAG_SESS_VALUE    = 0x10,    // Diagnostic Session Control
+    REQ_ECU_RESET_VALUE    = 0x11,    // ECU Reset
+    REQ_CLR_DIAG_VALUE     = 0x14,    // Clear Diagnostic Information
+    REQ_DTC_VALUE          = 0x19,    // Request DTC (Diagnostic Trouble Codes)
+    REQ_READ_VALUE         = 0x22,    // Read Data by Identifier
+    REQ_SEC_ACC_VALUE      = 0x27,    // Security Access
+    REQ_COMM_CTRL_VALUE    = 0x28,    // Communication Control
+    REQ_WRITE_VALUE        = 0x2E,    // Write Data by Identifier
+    REQ_ROUTINE_VALUE      = 0x31,    // Routine Control
+    REQ_DOWNLOAD_VALUE     = 0x34,    // Request Download
+    REQ_UPLOAD_VALUE       = 0x35,    // Request Upload
+    REQ_XFER_DATA_VALUE    = 0x36,    // Transfer Data
+    REQ_XFER_EXIT_VALUE    = 0x37,    // Transfer Exit
+    REQ_TESTER_VALUE       = 0x3E     // Tester Present
+} CAN_Request_Command_Values;
+
+typedef enum {
     RESP_DIAG_SESS,       // 0x50
     RESP_ECU_RESET,       // 0x51
     RESP_CLR_DIAG,        // 0x54
@@ -215,6 +232,23 @@ typedef enum {
     RESP_TESTER,          // 0x7E
     RESP_NEG              // 0x7F
 } CAN_Reply_Command_Index;
+
+typedef enum {
+    RESP_DIAG_SESS_VALUE    = 0x50,    // Diagnostic Session Response
+    RESP_ECU_RESET_VALUE    = 0x51,    // ECU Reset Response
+    RESP_CLR_DIAG_VALUE     = 0x54,    // Clear Diagnostic Information Response
+    RESP_DTC_VALUE          = 0x59,    // Diagnostic Trouble Code Response
+    RESP_READ_VALUE         = 0x62,    // Read Data by Identifier Response
+    RESP_SEC_ACC_VALUE      = 0x67,    // Security Access Response
+    RESP_COMM_CTRL_VALUE    = 0x68,    // Communication Control Response
+    RESP_WRITE_VALUE        = 0x6E,    // Write Data by Identifier Response
+    RESP_ROUTINE_VALUE      = 0x71,    // Routine Control Response
+    RESP_DOWNLOAD_VALUE     = 0x74,    // Request Download Response
+    RESP_XFER_DATA_VALUE    = 0x76,    // Transfer Data Response
+    RESP_XFER_EXIT_VALUE    = 0x77,    // Transfer Exit Response
+    RESP_TESTER_VALUE       = 0x7E,    // Tester Present Response
+    RESP_NEG_VALUE          = 0x7F     // Negative Response
+} CAN_Reply_Command_Values;
 
 // device_configs.h
 #define CAN_DEVICE_COUNT 2  // Number of devices in the array

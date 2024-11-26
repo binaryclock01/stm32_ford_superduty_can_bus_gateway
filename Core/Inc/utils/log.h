@@ -17,10 +17,11 @@
 #include <stdint.h>
 
 #include "config.h"
+#include "buffers.h"
 #include "main.h"
 
+
 #include "rtos.h"
-#include "buffers.h"
 #include "can_packet.h"
 //#include "can_common.h"
 
@@ -68,7 +69,6 @@ typedef struct {
 void report_log_buffer_heap_size(void);
 void report_log_buffer_fullness(void);
 
-LogBuffer *get_log_buffer_global_ptr(void);
 bool create_log_buffer__heap__(void);
 void destroy_log_buffer__heap__(void);
 
@@ -121,7 +121,7 @@ void flush_logs(void);
  * @param dlc Data length code.
  */
 // if you uncomment this, you have to try to include buffers.h.  I can't figure out why it gets all messed up. Just let it be implicit for now.
-//void log_transmitted_can_message(Circular_Queue_Types queue_num, uint64_t request_id, uint8_t *TxData, uint8_t dlc);
+//void log_transmitted_can_message(Circular_Queue_Types queue_num, uint32_t request_id, uint8_t *TxData, uint8_t dlc);
 
 /* --- Task Functions --- */
 

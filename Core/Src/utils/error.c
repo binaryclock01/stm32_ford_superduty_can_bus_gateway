@@ -4,29 +4,17 @@
  * Implements error handling utilities for the application.
  */
 
-#include <stdarg.h>  // For handling variable arguments in functions
-#include <stdio.h>   // For snprintf, printf
-#include <string.h>  // For string manipulation
-#include "error.h"
-#include "ui.h"      // For sending console messages
-#include "ansi.h"
-
-/* -----------------------------------------------------------------------------
-   Error Table
-   -------------------------------------------------------------------------- */
-
-/*
- * error.c
- *
- * Implements error handling utilities for the application.
- */
 
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
-#include "error.h"
-#include "ui.h"
+
+#include "config.h"
+#include "buffers.h"
 #include "log.h"
+#include "ansi.h"
+#include "error.h"
+
 
 /* -----------------------------------------------------------------------------
    Error Table

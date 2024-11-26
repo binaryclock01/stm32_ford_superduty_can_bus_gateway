@@ -4,6 +4,8 @@
  *  Created on: Nov 22, 2024
  *      Author: Ryan
  */
+
+#include "buffers.h"
 #include "log.h"
 #include "core_cm4.h"
 #include "ansi.h"

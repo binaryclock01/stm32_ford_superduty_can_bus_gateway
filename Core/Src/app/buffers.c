@@ -6,13 +6,25 @@
  */
 
 #include <stdio.h>
+#include "FreeRTOS.h"  // For pvPortMalloc
 
-#include "buffers.h"
 #include "config.h"
+#include "buffers.h"
+#include "log.h"
 #include "can_helper.h"
 #include "ansi.h"
 #include "error.h"
 #include "can_rx.h"
+#include "hid.h"
+
+
+// sliding buffer variables for HID (touch screen)
+
+/* Implemented queues instead... keeping this for now
+uint8_t _g_hid_rx_sliding_buffer[HID_RX_BUFFER_SIZE]; // Circular buffer for receiving data
+uint8_t _g_hid_rx_packet_buffer[HID_RXDATA_MAX_LENGTH];       // Buffer to hold a single valid packet
+uint8_t _g_hid_rx_sliding_buffer_index = 0;       // Current index in rx_buffer
+*/
 
 const char* Circular_Queue_Types_Names[] = {
 	    "QUEUE_RX_CAN1",
@@ -37,8 +49,92 @@ volatile CAN_Rx_Packet g_isr_rx_buffer[ISR_BUFFER_SIZE];
 volatile size_t g_isr_rx_buffer_write_index = 0;
 volatile size_t g_isr_rx_buffer_read_index = 0;
 
+LogBuffer *_g_ptr_log_buffer = NULL; // Global pointer to heap-allocated log buffer
 
+void __buffers_destroy_log_buffer__heap__(void)
+{
+	// _g_ptr_log_buffer is a global pointer, pointing to the log buffer created in the heap
+	if (_g_ptr_log_buffer != NULL) {
+		if (_g_ptr_log_buffer->mutex_id != NULL) {
+			osMutexDelete(_g_ptr_log_buffer->mutex_id); // Delete the mutex
+		}
+		if (_g_ptr_log_buffer->messages != NULL) {
+			vPortFree(_g_ptr_log_buffer->messages); // Free the messages array
+		}
+		vPortFree(_g_ptr_log_buffer); // Free the structure itself
+	}
+}
 
+LogBuffer *get_log_buffer_global_ptr()
+{
+	return (LogBuffer *)_g_ptr_log_buffer;
+}
+
+void report_log_buffer_fullness(void) {
+	LogBuffer *buffer = get_log_buffer_global_ptr();
+	if (buffer == NULL) {
+        printf("Log buffer is not initialized.\n");
+        return;
+    }
+
+    printf("* Log buffer fullness:\n");
+    printf("  - Messages in buffer: " BWHT "%d" CRESET " / " BWHT "%d" CRESET "\r\n", buffer->count, LOG_BUFFER_SIZE);
+    printf("  - Percent full: " BWHT "%.2f%%" CRESET "\r\n", (buffer->count / (float)LOG_BUFFER_SIZE) * 100.0);
+}
+
+void report_log_buffer_heap_size(void) {
+	LogBuffer *buffer = get_log_buffer_global_ptr();
+	if (buffer == NULL) {
+        printf("Log buffer is not initialized.\n");
+        return;
+    }
+
+    uint32_t structure_size = sizeof(LogBuffer);
+    uint32_t messages_size = LOG_BUFFER_SIZE * LOG_MESSAGE_MAX_LENGTH;
+    uint32_t total_size = structure_size + messages_size;
+
+    char buf[255];
+    log_message("* Log buffer HEAP usage:");
+    sprintf(buf, "  - Structure size: " BWHT "%lu " CRESET "bytes", structure_size);
+    log_message(buf);
+    sprintf(buf, "  - Messages array size: " BWHT "%lu " CRESET "bytes", messages_size);
+    log_message(buf);
+    sprintf(buf, "  - Total size: " BWHT "%lu " CRESET "bytes", total_size);
+    log_message(buf);
+}
+
+bool __buffers__create_log_buffer__heap__(void)
+{
+    // Allocate memory for the LogBuffer structure
+	_g_ptr_log_buffer = (LogBuffer *)pvPortMalloc(sizeof(LogBuffer));
+    if (_g_ptr_log_buffer == NULL) {
+        user_error_handler(ERROR_HEAP_CREATE_LOG_BUFFER, "Failed to allocate memory for log buffer structure!");
+        return false; // Allocation failed
+    }
+
+    // Initialize the structure
+    _g_ptr_log_buffer->head = 0;
+    _g_ptr_log_buffer->tail = 0;
+    _g_ptr_log_buffer->count = 0;
+
+    // Allocate memory for the messages array
+    _g_ptr_log_buffer->messages = (char (*)[LOG_MESSAGE_MAX_LENGTH])pvPortMalloc(LOG_BUFFER_SIZE * LOG_MESSAGE_MAX_LENGTH);
+    if (_g_ptr_log_buffer->messages == NULL) {
+        log_message("Failed to allocate memory for log messages array!");
+        vPortFree(_g_ptr_log_buffer); // Free the structure if array allocation fails
+        return false;
+    }
+
+    // Initialize the mutex for thread-safe access
+    _g_ptr_log_buffer->mutex_id = osMutexNew(NULL);
+    if (_g_ptr_log_buffer->mutex_id == NULL) {
+        log_message("Failed to create mutex for log buffer!");
+        vPortFree(_g_ptr_log_buffer->messages); // Free the array
+        vPortFree(_g_ptr_log_buffer);           // Free the structure
+        return false;
+    }
+    return true;
+}
 
 void init_circular_buffers(void) {
     char buf[255];

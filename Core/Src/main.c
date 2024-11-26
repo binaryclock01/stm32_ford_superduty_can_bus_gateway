@@ -28,21 +28,23 @@
 #include <stdbool.h> // for boolean support in c
 
 #include "config.h"
+#include "buffers.h"
 #include "can_common.h"
 #include "device_configs.h"
 #include "log.h"
-#include "ui.h"
 #include "error.h"
 #include "rtos.h"
 #include "can_core.h"
 #include "utils.h"
 #include "system.h"
-#include "buffers.h"
+#include "queues.h"
+
 #include "rtos_tasks.h"
 #include "callbacks.h"
 
 #ifdef IS_SIMULATOR
 #include "sim.h"
+#include "ansi.h"
 #endif // IS_SIMULATOR
 
 
@@ -80,6 +82,7 @@ I2C_HandleTypeDef hi2c1;
 
 UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart2;
+DMA_HandleTypeDef hdma_usart1_rx;
 
 /* Definitions for CAN1_Rx_Task */
 osThreadId_t CAN1_Rx_TaskHandle;
@@ -123,6 +126,11 @@ const osThreadAttr_t CAN2_Tx_Task_attributes = {
   .stack_size = 1024 * 4,
   .priority = (osPriority_t) osPriorityNormal,
 };
+/* Definitions for HID_UART_Rx_Queue */
+osMessageQueueId_t HID_UART_Rx_QueueHandle;
+const osMessageQueueAttr_t HID_UART_Rx_Queue_attributes = {
+  .name = "HID_UART_Rx_Queue"
+};
 /* USER CODE BEGIN PV */
 
 // Queue attributes are created in rtos.c
@@ -132,6 +140,7 @@ const osThreadAttr_t CAN2_Tx_Task_attributes = {
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
+static void MX_DMA_Init(void);
 static void MX_CAN1_Init(void);
 static void MX_I2C1_Init(void);
 static void MX_CAN2_Init(void);
@@ -194,6 +203,10 @@ bool configure_can_filter(CAN_HandleTypeDef *hcan, const CAN_FilterTypeDef *filt
 /*
  * FUNCTIONS
  */
+
+
+
+
 
 /**
  * @brief Interrupt callback for CAN Rx FIFO0 messages.
@@ -264,6 +277,7 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_DMA_Init();
   MX_CAN1_Init();
   MX_I2C1_Init();
   MX_CAN2_Init();
@@ -272,10 +286,10 @@ int main(void)
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
 
+  init_hid_uart_rx_queue();
+  HAL_UART_Receive_DMA(&huart1, _g_hid_rxdata, 5);
   //bool sim_mode = is_sim_mode_enabled();
 
-  NEXTION_SendString("t0", "Hello");
-  NEXTION_SendString("t1", "World!");
 
   send_clear_screen_ansi_code();
 
@@ -316,6 +330,10 @@ int main(void)
   /* USER CODE BEGIN RTOS_TIMERS */
   /* start timers, add new ones, ... */
   /* USER CODE END RTOS_TIMERS */
+
+  /* Create the queue(s) */
+  /* creation of HID_UART_Rx_Queue */
+  HID_UART_Rx_QueueHandle = osMessageQueueNew (20, sizeof(HID_UART_Rx_Packet), &HID_UART_Rx_Queue_attributes);
 
   /* USER CODE BEGIN RTOS_QUEUES */
 
@@ -641,6 +659,22 @@ static void MX_USART2_UART_Init(void)
 }
 
 /**
+  * Enable DMA controller clock
+  */
+static void MX_DMA_Init(void)
+{
+
+  /* DMA controller clock enable */
+  __HAL_RCC_DMA2_CLK_ENABLE();
+
+  /* DMA interrupt init */
+  /* DMA2_Stream2_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA2_Stream2_IRQn, 5, 0);
+  HAL_NVIC_EnableIRQ(DMA2_Stream2_IRQn);
+
+}
+
+/**
   * @brief GPIO Initialization Function
   * @param None
   * @retval None
@@ -692,8 +726,6 @@ void StartCAN1_Rx_Task(void *argument)
   /* Infinite loop */
   CAN_Packet *packet = NULL;
   for (;;) {
-	  osDelay(1000);
-	  /*
       if (osMessageQueueGet(can_circular_buffer[QUEUE_RX_CAN1].queue_handle, &packet, NULL, osWaitForever) == osOK) {
     	  //checkTaskStackUsage();
           if (packet != NULL) {
@@ -707,7 +739,6 @@ void StartCAN1_Rx_Task(void *argument)
               __rtos__StartCAN_Rx_Task(CAN_TRUCK, packet);
           }
       }
-      */
   }
   /* USER CODE END 5 */
 }
@@ -793,9 +824,9 @@ void StartHousekeeping_Task(void *argument)
 void StartCAN_Tx_Send_Requests(void *argument)
 {
   /* USER CODE BEGIN StartCAN_Tx_Send_Requests */
-//#ifdef IS_SIMULATOR
-//	osThreadSuspend(osThreadGetId());
-//#else
+#ifdef IS_SIMULATOR
+	osThreadSuspend(osThreadGetId());
+#else
 	/* Infinite loop */
 	for (;;)
 	{
@@ -817,7 +848,7 @@ void StartCAN_Tx_Send_Requests(void *argument)
       osDelay(15000);
 	}
       //osThreadYield();
-//#endif
+#endif
   /* USER CODE END StartCAN_Tx_Send_Requests */
 }
 

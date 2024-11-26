@@ -6,17 +6,25 @@
  */
 
 // only load this file if in the SIMULATOR mode
+#ifndef INC_SIM_H_
+#define INC_SIM_H_
+
+#ifdef IS_SIMULATOR
 
 #include <stdbool.h>
 #include <stdint.h>
 
 #include "config.h"
 #include "device_configs.h"
+#include "hid.h"
 
-#ifndef INC_SIM_H_
-#define INC_SIM_H_
-
-#ifdef IS_SIMULATOR
+extern bool _g_sim_brake_on;
+extern bool _g_sim_hazards_on;
+extern bool _g_sim_reverse_on;
+extern bool _g_sim_left_turn_on;
+extern bool _g_sim_right_turn_on;
+extern bool _g_sim_left_change_on;
+extern bool _g_sim_right_change_on;
 
 typedef struct {
 	bool hazard_button;
@@ -41,9 +49,12 @@ extern _SIM_Turn_Signal_States __sim__g_turn_signal_states;
 #define TURN_SIGNAL_COUNT 4
 
 bool is_sim_mode_enabled(void);
+
 void __sim__generate_packet_response_from_truck(CANDevicePID *device_pid, CAN_Command command);
 void __sim__initialize_states_mapping_array();
 
+#endif /* IS_SIMULATOR */
+
 #endif /* INC_SIM_H_ */
 
-#endif /* IS_SIMULATOR */
+

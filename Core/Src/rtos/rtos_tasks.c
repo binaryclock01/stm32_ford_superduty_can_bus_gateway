@@ -90,25 +90,3 @@ void __rtos__StartCAN_Tx_Task(CANInstance enum_can_instance, CAN_Packet *packet)
 	__rtos_send_tx_packet_to_can_interface(packet);
 	_free_can_packet_using_queue_type_from_circular_buffer(queue_enum);
 }
-
-
-void CAN_ProcessingTask(void *argument) {
-    for (;;) {
-        // Wait for a signal from the ISR
-        osThreadFlagsWait(0x01, osFlagsWaitAny, osWaitForever);
-
-        while (g_isr_rx_buffer_read_index != g_isr_rx_buffer_write_index) {
-            // Retrieve a packet from the ISR buffer
-        	CAN_Rx_Packet *rx_packet = (CAN_Rx_Packet *)&g_isr_rx_buffer[g_isr_rx_buffer_write_index];
-            g_isr_rx_buffer_read_index = (g_isr_rx_buffer_read_index + 1) % ISR_BUFFER_SIZE;
-
-            // Acquire the mutex and enqueue the message into the backend buffer
-            /*
-            osMutexAcquire(log_buffer_mutex_id, osWaitForever);
-            add_to_circular_buffer(&rx_packet); // Add packet to the backend
-            osMutexRelease(log_buffer_mutex_id);
-            */
-        }
-    }
-}
-

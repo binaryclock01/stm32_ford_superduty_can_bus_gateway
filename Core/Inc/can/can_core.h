@@ -20,6 +20,7 @@ extern "C" {
 #include <stdbool.h>            // Boolean support
 
 #include "config.h"
+#include "buffers.h"
 #include "device_configs.h"     // CANDeviceConfig, CANDevicePID, etc.
 //#include "can_common.h"         // Common CAN utilities
 #include "rtos.h"               // RTOS utilities

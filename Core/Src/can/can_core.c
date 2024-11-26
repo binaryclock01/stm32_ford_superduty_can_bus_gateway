@@ -17,8 +17,10 @@
 #include <inttypes.h> // Include for portable format specifiers
 #include <cmsis_os.h>        // RTOS CMSIS types, such as osMutedId_t
 
-#include "can_core.h"
 #include "config.h"
+#include "buffers.h"
+#include "can_core.h"
+
 #include "main.h"            // For HAL_CAN and other core includes
 #include "log.h"
 #include "error.h"

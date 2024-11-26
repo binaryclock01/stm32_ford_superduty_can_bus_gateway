@@ -19,11 +19,21 @@ extern "C" {
 #include <stdint.h>              // For fixed-width integer types
 #include <stdbool.h>             // For boolean support
 #include "config.h"
-//#include "can_common.h"          // Common CAN utilities
+#include "buffers.h"
+#include "log.h"                 // Logging utilities
 #include "can_packet.h"
 #include "rtos.h"                // RTOS utilities
-#include "log.h"                 // Logging utilities
 
+#include "hid.h"
+
+
+/*
+extern uint8_t _g_hid_rx_sliding_buffer[HID_RX_BUFFER_SIZE]; // Circular buffer for receiving data
+extern uint8_t _g_hid_rx_packet_buffer[HID_RXDATA_MAX_LENGTH];       // Buffer to hold a single valid packet
+extern uint8_t _g_hid_rx_sliding_buffer_index;       // Current index in rx_buffer
+*/
+
+extern LogBuffer *_g_ptr_log_buffer;
 
 /* --------------------------------------------------------------------------
    Typedefs
@@ -74,6 +84,13 @@ extern volatile size_t g_isr_rx_buffer_read_index;
 /* --------------------------------------------------------------------------
    Function Declarations
    -------------------------------------------------------------------------- */
+
+LogBuffer *get_log_buffer_global_ptr(void);
+void __buffers_destroy_log_buffer__heap__(void);
+bool __buffers__create_log_buffer__heap__(void);
+
+void report_log_buffer_fullness(void);
+void report_log_buffer_heap_size(void);
 
 /**
  * @brief Initializes all circular buffers for CAN queues.

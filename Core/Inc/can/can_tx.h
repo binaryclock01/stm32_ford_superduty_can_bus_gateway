@@ -22,6 +22,9 @@ extern "C" {
 #include "device_configs.h"      // For CANDeviceConfig, CANDevicePID, etc.
 #include "rtos.h"                // For RTOS utilities
 
+#ifdef IS_SIMULATOR
+#include "sim.h"
+#endif
 /* --------------------------------------------------------------------------
    Function Declarations
    -------------------------------------------------------------------------- */

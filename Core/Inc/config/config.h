@@ -9,8 +9,11 @@
 #define INC_CONFIG_H_
 
 // if this is uncommented, the program acts as if it was the truck, simulating can responses to requests
-//#define IS_SIMULATOR
+#define IS_SIMULATOR
 
+#define HID_DEVICE_UART 			USART1
+#define HID_QUEUE_RX_QUEUE_MAX		15
+#define HID_RXDATA_MAX_LENGTH 		5
 
 #define ISR_BUFFER_SIZE		10
 
@@ -19,7 +22,7 @@
 #define MAX_RETRIES 3                               /**< Maximum retries for CAN message transmission */
 
 #define LOG_BUFFER_SIZE 16   /**< Maximum number of messages in the log buffer */
-#define LOG_MESSAGE_MAX_LENGTH 256   /**< Maximum length of each log message */
+#define LOG_MESSAGE_MAX_LENGTH 256  /**< Maximum length of each log message */
 
 
 /** Used in can_core.c **/

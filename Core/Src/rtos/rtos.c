@@ -18,6 +18,7 @@
 //#include "ui.h"
 #include "config.h"
 #include "can_common.h"
+#include "buffers.h"
 #include "log.h"
 #include "ansi.h"
 #include "buffers.h"
