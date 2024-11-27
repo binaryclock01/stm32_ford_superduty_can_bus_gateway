@@ -122,7 +122,7 @@ void log_message(const char *format, ...) {
     }
 
 #ifdef IS_SIMULATOR
-    int final_len = snprintf(final_buf, sizeof(final_buf), "%sSIM: %s%s", YEL, buf, CRESET);
+    int final_len = snprintf(final_buf, sizeof(final_buf), "%sSIM: %s%s", YEL, CRESET, buf);
 #else
     int final_len = snprintf(final_buf, sizeof(final_buf), "%s", buf);
 #endif

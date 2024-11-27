@@ -126,6 +126,13 @@ const osThreadAttr_t CAN2_Tx_Task_attributes = {
   .stack_size = 1024 * 4,
   .priority = (osPriority_t) osPriorityNormal,
 };
+/* Definitions for HID_RxUART_Task */
+osThreadId_t HID_RxUART_TaskHandle;
+const osThreadAttr_t HID_RxUART_Task_attributes = {
+  .name = "HID_RxUART_Task",
+  .stack_size = 1024 * 4,
+  .priority = (osPriority_t) osPriorityNormal,
+};
 /* Definitions for HID_UART_Rx_Queue */
 osMessageQueueId_t HID_UART_Rx_QueueHandle;
 const osMessageQueueAttr_t HID_UART_Rx_Queue_attributes = {
@@ -153,6 +160,7 @@ void StartCAN1_Tx_Task(void *argument);
 void StartHousekeeping_Task(void *argument);
 void StartCAN_Tx_Send_Requests(void *argument);
 void StartCAN2_Tx_Task(void *argument);
+void StartHID_RxUART_Task(void *argument);
 
 /* USER CODE BEGIN PFP */
 
@@ -359,6 +367,9 @@ int main(void)
 
   /* creation of CAN2_Tx_Task */
   CAN2_Tx_TaskHandle = osThreadNew(StartCAN2_Tx_Task, NULL, &CAN2_Tx_Task_attributes);
+
+  /* creation of HID_RxUART_Task */
+  HID_RxUART_TaskHandle = osThreadNew(StartHID_RxUART_Task, NULL, &HID_RxUART_Task_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
 
@@ -871,6 +882,26 @@ void StartCAN2_Tx_Task(void *argument)
 		//osDelay(1);
   }
   /* USER CODE END StartCAN2_Tx_Task */
+}
+
+/* USER CODE BEGIN Header_StartHID_RxUART_Task */
+/**
+* @brief Function implementing the HID_RxUART_Task thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartHID_RxUART_Task */
+void StartHID_RxUART_Task(void *argument)
+{
+  /* USER CODE BEGIN StartHID_RxUART_Task */
+	/* Infinite loop */
+	HID_UART_Rx_Packet packet;
+	for(;;)
+	{
+		__rtos__StartHID_RxUART_Task(argument, &packet);
+		osDelay(1);
+	}
+	/* USER CODE END StartHID_RxUART_Task */
 }
 
 /**

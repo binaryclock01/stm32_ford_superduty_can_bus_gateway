@@ -32,9 +32,9 @@
 
 typedef enum {
 	CAN_ID_BCM_REQUEST = 0x726,
-	CAN_ID_BCM_REPLY = 0x72E,
+	CAN_ID_BCM_RESPONSE = 0x72E,
 	CAN_ID_SCCM_REQUEST = 0x724,
-	CAN_ID_SCCM_REPLY = 0x72C,
+	CAN_ID_SCCM_RESPONSE = 0x72C,
 } CAN_StdIds;
 
 typedef struct {

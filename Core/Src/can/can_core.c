@@ -103,6 +103,7 @@ void send_all_requests(void) {
 //    log_circular_buffer_usage();
 }
 
+
 bool is_signal_on(const CANSignal *signal) {
     // Validate input
     if (signal == NULL) {

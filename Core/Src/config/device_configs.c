@@ -42,7 +42,7 @@ CANDevicePID bcm_pids[] = {
               .change_type = STATE_BIT, .data = 0,
 			  .relevant_data_bytes = 4,
 			  .state_off   = {0x20, 0x00, 0x00, 0x00},
-              .state_on    = {0x40, 0x00, 0x00, 0x00} }
+              .state_on    = {0x60, 0x00, 0x00, 0x00} }
         }
     },
     {
@@ -103,8 +103,8 @@ CANDevicePID sccm_pids[] = {
 //
 // Which is a typedef enum CAN_Ids in device_config.h.  Ensure they stay the same!!
 CANDeviceConfig can_devices[CAN_DEVICE_COUNT] = {
-    { .device_name = "BCM", .id.request = CAN_ID_BCM_REQUEST, .id.response = CAN_ID_BCM_REPLY, .pids = bcm_pids, .pid_count = BCM_PID_COUNT },
-    { .device_name = "SCCM", .id.request = CAN_ID_SCCM_REQUEST, .id.response = CAN_ID_SCCM_REPLY, .pids = sccm_pids, .pid_count = SCCM_PID_COUNT }
+    { .device_name = "BCM", .id.request = CAN_ID_BCM_REQUEST, .id.response = CAN_ID_BCM_RESPONSE, .pids = bcm_pids, .pid_count = BCM_PID_COUNT },
+    { .device_name = "SCCM", .id.request = CAN_ID_SCCM_REQUEST, .id.response = CAN_ID_SCCM_RESPONSE, .pids = sccm_pids, .pid_count = SCCM_PID_COUNT }
 };
 
 CANCommands can_request_commands[] = {

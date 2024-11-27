@@ -6,6 +6,7 @@
  */
 
 #include <stdio.h>
+#include <string.h>
 
 #include "main.h"
 #include "can_common.h"
@@ -13,6 +14,42 @@
 #include "buffers.h"
 #include "can_packet.h"
 #include "device_configs.h"
+
+
+CANSignal *get_pid_signal_by_name(const char *signal_name) {
+    // Iterate over all CAN devices
+    for (int i = 0; i < CAN_DEVICE_COUNT; i++) {
+        CANDeviceConfig *device = &can_devices[i];
+
+        // Iterate over each PID in the device
+        for (int j = 0; j < device->pid_count; j++) {
+            CANDevicePID *pid = &device->pids[j];
+
+            // Iterate over signals in the PID
+            for (int k = 0; k < pid->num_of_signals; k++) {
+                CANSignal *signal = &pid->signals[k];
+
+                // Compare the signal name with the given name
+                if (strcmp(signal->name, signal_name) == 0) {
+                    return signal; // Found the signal, return it
+                }
+            }
+        }
+    }
+
+    // Signal not found
+    return NULL;
+}
+
+bool get_signal_data(const CANSignal *signal)
+{
+    // Validate input
+    if (signal == NULL) {
+        return false; // Signal is invalid
+    }
+
+    return signal->data;
+}
 
 /** "Unknown CAN"
  * @brief Retrieves the CAN instance for the given hardware instance.

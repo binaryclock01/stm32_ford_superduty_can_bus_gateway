@@ -27,6 +27,9 @@ extern "C" {
    Function Declarations
    -------------------------------------------------------------------------- */
 
+bool get_signal_data(const CANSignal *signal);
+CANSignal *get_pid_signal_by_name(const char *signal_name);
+
 /**
  * @brief Retrieves the CAN instance for the given hardware instance.
  *

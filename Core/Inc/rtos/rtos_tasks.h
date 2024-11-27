@@ -19,6 +19,7 @@ extern "C" {
 #include <stdint.h>              // For fixed-width integer types
 #include "rtos_tasks.h"
 #include "can_packet.h"
+#include "queues.h"
 
 //#include "can_common.h"          // Common CAN utilities
 
@@ -49,15 +50,7 @@ void __rtos__StartCAN_Rx_Task(CANInstance enum_can_instance, CAN_Packet *packet)
  */
 void __rtos__StartCAN_Tx_Task(CANInstance enum_can_instance, CAN_Packet *packet);
 
-/**
- * @brief RTOS task for processing CAN packets from an ISR.
- *
- * Waits for a signal from the ISR, retrieves packets from the ISR buffer,
- * and enqueues them into the backend circular buffer for further processing.
- *
- * @param argument Pointer to any arguments for the task (unused in this implementation).
- */
-void CAN_ProcessingTask(void *argument);
+void __rtos__StartHID_RxUART_Task(void *pvParameters, HID_UART_Rx_Packet *packet);
 
 #ifdef __cplusplus
 }
