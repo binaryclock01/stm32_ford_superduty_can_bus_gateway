@@ -78,6 +78,7 @@ void __sim__initialize_states_mapping_array() {
     __sim__g_states_mapping_array[2] = __sim__g_turn_signal_states.turn_left_change_state;
     __sim__g_states_mapping_array[3] = __sim__g_turn_signal_states.turn_right_change_state;
 }
+/*
 
 uint8_t multiplex_turn_signal_states(_SIM_Turn_Signal_States *turn_signal_states, _SIM_Signal_States *signal_states) {
 	// assign the mapping arrays
@@ -101,29 +102,32 @@ uint8_t multiplex_turn_signal_states(_SIM_Turn_Signal_States *turn_signal_states
 
     return multiplexed_byte;
 }
+*/
 
 /**
  * @brief Creates a simulated READ response packet for the given PID.
  *
  * @param device_pid Pointer to the CANDevicePID structure representing the PID.
- * @param packet Pointer to the CAN_Tx_Packet structure to store the generated packet.
+ * @param packet Pointer to the CAN_Packet structure to store the generated packet.
+ * @param tx_header Pointer to the CAN_TxHeaderTypeDef structure for the TX header.
+ * @param stdid CAN standard ID.
+ * @param signal_payload Precomputed payload to use directly.
  * @return True if the packet was successfully created; false otherwise.
  */
-bool __sim__create_read_response_packet_for_pid(CANDevicePID *device_pid, CAN_Packet *packet, CAN_TxHeaderTypeDef *tx_header, CAN_StdIds stdid)
+bool __sim__create_read_response_packet_for_pid(
+    CANDevicePID *device_pid,
+    CAN_Packet *packet,
+    CAN_TxHeaderTypeDef *tx_header,
+    CAN_StdIds stdid,
+    const uint8_t *signal_payload)
 {
-    if (device_pid == NULL || packet == NULL) {
-        log_message("Error: Null device_pid or packet in __sim__create_read_response_packet_for_pid");
-        return false;
-    }
-
-    // Validate relevant_data_bytes
-    if (device_pid->signals[0].relevant_data_bytes > 4 || device_pid->signals[0].relevant_data_bytes < 1) {
-        log_message("Error: Invalid relevant_data_bytes (%d)", device_pid->signals[0].relevant_data_bytes);
+    if (device_pid == NULL || packet == NULL || signal_payload == NULL) {
+        log_message("Error: Null parameter in __sim__create_read_response_packet_for_pid");
         return false;
     }
 
     // Set the total data length
-    packet->payload[DATA_LENGTH_START] = (DATA_PAYLOAD_START - 1) + device_pid->signals[0].relevant_data_bytes;
+    packet->payload[DATA_LENGTH_START] = (DATA_PAYLOAD_START - 1) + MAX_PAYLOAD_BYTE_LENGTH;
 
     // Set the response command
     packet->payload[DATA_COMMAND_START] = RESP_READ_VALUE;
@@ -133,27 +137,69 @@ bool __sim__create_read_response_packet_for_pid(CANDevicePID *device_pid, CAN_Pa
         packet->payload[DATA_PID_START + i] = device_pid->pid_id[i];
     }
 
-    // Determine which state array to use
-    const uint8_t *pid_state_array = NULL;
-
-    if (get_signal_data(&device_pid->signals[0])) {
-        pid_state_array = device_pid->signals[0].state_on;
-    } else {
-        pid_state_array = device_pid->signals[0].state_off;
+    // Copy the signal payload directly into the packet
+    for (int i = 0; i < MAX_PAYLOAD_BYTE_LENGTH; i++) {
+        packet->payload[DATA_PAYLOAD_START + i] = signal_payload[i];
     }
 
-    // Copy the state array into the payload
-    // just do 4. if we don't do 4, then we'll get garbage on the last bytes. In device_configs if bytes are not used
-    // Ford just sends 0xCC. Those 0xCC codes were copied into the state data arrays too, so just copy the entire thing.
-    for (int i = 0; i < 4; i++) {
-        packet->payload[DATA_PAYLOAD_START + i] = pid_state_array[i];
-    }
-
+    // Create CAN TX header
     create_can_tx_header(tx_header, stdid);
 
     return true;
 }
 
+void __sim__send_tx_packet_response_to_can1(CANDevicePID *device_pid, const uint8_t *signal_payload)
+{
+    CANDeviceConfig *can_device_ptr = &(can_devices[device_pid->device_parent_id]);
+    uint32_t stdid_from_device = can_device_ptr->id.response;
+
+    CAN_Packet packet;
+    CAN_TxHeaderTypeDef tx_header;
+
+    if (!__sim__create_read_response_packet_for_pid(device_pid, &packet, &tx_header, stdid_from_device, signal_payload)) {
+        log_message("* Error generating SIM Tx Packet for command: RESP_READ_VALUE!");
+        return;
+    }
+
+    packet.header.dlc = tx_header.DLC;
+    packet.flow = PACKET_TX;
+    packet.meta.can_instance = CAN_TRUCK;
+    packet.meta.timestamp = HAL_GetTick();
+    packet.header.filter_match = 0;
+    packet.header.id = tx_header.StdId;
+    packet.header.is_extended_id = false;
+    packet.header.is_remote_frame = false;
+    packet.header.timestamp = packet.meta.timestamp;
+
+    log_raw_can_packet(&packet);
+
+    uint32_t tx_mailbox;
+    if (HAL_CAN_AddTxMessage(&hcan1, &tx_header, packet.payload, &tx_mailbox) != HAL_OK) {
+        log_message("* Failed to transmit CAN packet!");
+    }
+}
+
+
+
+void __sim__generate_multiplexed_payload(CANDevicePID *device_pid, uint8_t *multiplexed_payload) {
+    // Initialize the payload to all zeros
+    for (int i = 0; i < MAX_PAYLOAD_BYTE_LENGTH; i++) {
+        multiplexed_payload[i] = 0x00;
+    }
+
+    // Iterate through each signal in the PID
+    for (uint8_t signal_idx = 0; signal_idx < device_pid->num_of_signals; signal_idx++) {
+        const CANSignal *signal = &device_pid->signals[signal_idx];
+
+        // Check if the signal's data is non-zero
+        if (signal->data != 0) {
+            // Apply the relevant "state_on" bytes to the multiplexed payload
+            for (uint8_t byte_idx = 0; byte_idx < signal->relevant_data_bytes; byte_idx++) {
+                multiplexed_payload[byte_idx] |= signal->state_on[byte_idx];
+            }
+        }
+    }
+}
 
 /**
  * @brief Generate a simulated CAN packet response from the truck based on PID and command.
@@ -178,102 +224,48 @@ void __sim__generate_packet_response_from_truck(CANDevicePID *device_pid, CAN_Co
 
     switch (request_command->byte)
     {
-        case REQ_READ_VALUE: // Process Read Data by Identifier
-        	log_message("* CAN Command Received: " BWHT "%02X" CRESET ": " BWHT "%s" CRESET, request_command->byte, request_command->name);
-            switch (device_pid->state_generation_type)
-            {
-                case CAN_STATE_GENERATION_NON_MULTIPLEXED_BYTE:
-                    // Single signal logic for non-multiplexed byte generation
-                    if (device_pid->num_of_signals == 1) {
-                        // Check the single signal's state
-                        bool is_state_on = (get_signal_data(&device_pid->signals[0]) > 0 ? true : false);
+    case REQ_READ_VALUE: {
+        log_message("* CAN Command Received: " BWHT "%02X" CRESET ": " BWHT "%s" CRESET,
+                    request_command->byte, request_command->name);
 
-                        log_message("* State of " BWHT "%s " CRESET "is: " BWHT "%s" CRESET, device_pid->name, is_state_on ? "ON" : "OFF");
+        switch (device_pid->state_generation_type) {
+            case CAN_STATE_GENERATION_NON_MULTIPLEXED_BYTE: {
+                uint8_t signal_payload[MAX_PAYLOAD_BYTE_LENGTH] = {0};
+
+                // Non-multiplexed case: Use only the first signal's state
+                const CANSignal *signal = &device_pid->signals[0];
+                if (signal->data != 0) {
+                    for (uint8_t i = 0; i < signal->relevant_data_bytes; i++) {
+                        signal_payload[i] = signal->state_on[i];
                     }
+                }
 
-                    CAN_Packet packet;
-                    CAN_TxHeaderTypeDef tx_header;
-                    uint32_t stdid_from_device = CAN_ID_BCM_RESPONSE;
+                __sim__send_tx_packet_response_to_can1(device_pid, signal_payload);
+                break;
+            }
 
-                    if (!__sim__create_read_response_packet_for_pid(device_pid, &packet, &tx_header,stdid_from_device))
-                    {
-                    	log_message("* Error generating SIM Tx Packet for command: RESP_READ_VALUE!");
-                    	return;
-                    }
+            case CAN_STATE_GENERATION_MULTIPLEXED_BYTE: {
+                uint8_t signal_payload[MAX_PAYLOAD_BYTE_LENGTH] = {0};
 
-                    packet.header.dlc 	= tx_header.DLC;
-                    packet.flow 		= PACKET_TX;
-                    packet.meta.can_instance = CAN_TRUCK;
-                    packet.meta.timestamp = HAL_GetTick();
-                    packet.header.filter_match = 0;
-                    packet.header.id = tx_header.StdId;
-                    packet.header.is_extended_id = false;
-                    packet.header.is_remote_frame = false;
-                    packet.header.timestamp = packet.meta.timestamp;
-
-                    log_raw_can_packet(&packet);
-
-                    uint32_t tx_mailbox;
-                    if (HAL_CAN_AddTxMessage(&hcan1, &tx_header, packet.payload, &tx_mailbox) != HAL_OK) {
-                        log_message("* Failed to transmit CAN packet!");
-                    } else {
-                        //log_message("* Successfully transmitted CAN packet.");
-                    }
-
-                    break;
-
-                case CAN_STATE_GENERATION_MULTIPLEXED_BYTE: {
-                    /**
-                     * MULTIPLEXED_BYTE logic:
-                     * - Iterate through all signals in the PID.
-                     * - Use a turn signal bitmask to determine the relevant bit for each signal.
-                     * - Mask the signal's `data` with both the bitmask and the relevant bytes mask.
-                     * - Compare the result with the predefined `state_on` to check if the signal is "on."
-                     * - If the signal is "on," set the corresponding bit in the multiplexed byte.
-                     */
-
-                    uint8_t multiplexed_byte = 0x00; // Initialize response byte to 0
-
-                    for (uint8_t i = 0; i < device_pid->num_of_signals; i++) {
-                        const CANSignal *signal = &device_pid->signals[i];
-
-                        // 1. Retrieve the bitmask for this signal
-                        uint64_t bitmask = _g_turn_signal_bitmask_mapping_array[i];
-
-                        // 2. Apply the relevant byte mask to isolate only relevant data bytes
-                        uint32_t relevant_mask = get_relevant_mask(signal->relevant_data_bytes);
-
-                        // 3. Mask the signal's `data` with `bitmask` and `relevant_mask`
-                        uint64_t masked_data = signal->data & relevant_mask & ~bitmask;
-
-                        /**
-                         * 4. Compute `signal_on_masked`:
-                         * - Mask the predefined `state_on` value with the `relevant_mask` and `bitmask`.
-                         * - This ensures `state_on` is precisely aligned with the relevant bits in `data`.
-                         */
-                        uint32_t signal_on_masked = (*((uint32_t *)signal->state_on) & relevant_mask & bitmask);
-
-                        /**
-                         * 5. Final Check:
-                         * Compare the masked `data` to the masked `state_on` value.
-                         * - Ensures that only the relevant bits are evaluated.
-                         * - Prevents mismatches due to unrelated or reserved bits.
-                         */
-                        if (masked_data == signal_on_masked) {
-                            // Signal is "on": Set the corresponding bit in the multiplexed byte
-                            multiplexed_byte |= ~bitmask;
+                for (uint8_t i = 0; i < device_pid->num_of_signals; i++) {
+                    const CANSignal *signal = &device_pid->signals[i];
+                    if (signal->data != 0) {
+                        for (uint8_t j = 0; j < signal->relevant_data_bytes; j++) {
+                            signal_payload[j] |= signal->state_on[j];
                         }
                     }
+                }
 
-                    // Output the computed multiplexed byte
-                    log_message("* State of " BWHT "%s " CRESET "is: " BWHT "%08X" CRESET, device_pid->name, multiplexed_byte);
-                } break;
-
-                default:
-                    log_message("* " RED "Unknown state generation type." CRESET);
-                    break;
+                __sim__send_tx_packet_response_to_can1(device_pid, signal_payload);
+                break;
             }
-            break;
+
+            default:
+                log_message("* " RED "Unknown state generation type." CRESET);
+                break;
+        }
+        break;
+    }
 
         default:
             log_message("* " RED "CAN Command not implemented for response: " BWHT "0x%02X" CRESET ": " BWHT "%s" CRESET, command, request_command->name);

@@ -21,6 +21,7 @@ const uint64_t _g_turn_signal_bitmask_mapping_array[] = {
 CANDevicePID bcm_pids[] = {
     {
         .name = "Hazard Button", .short_name = "Hzd",
+		.device_parent_id = CAN_ID_BCM,
         .pid_id = {0x71, 0x50},
 		.num_of_signals = 1,
 		.state_generation_type = CAN_STATE_GENERATION_NON_MULTIPLEXED_BYTE,
@@ -34,6 +35,7 @@ CANDevicePID bcm_pids[] = {
     },
     {
         .name = "Brake Pedal", .short_name = "Brk",
+		.device_parent_id = CAN_ID_BCM,
         .pid_id = {0x2B, 0x00},
 		.num_of_signals = 1,
 		.state_generation_type = CAN_STATE_GENERATION_NON_MULTIPLEXED_BYTE,
@@ -47,6 +49,7 @@ CANDevicePID bcm_pids[] = {
     },
     {
         .name = "Reverse Light", .short_name = "Rev",
+		.device_parent_id = CAN_ID_BCM,
         .pid_id = {0x40, 0xC8},
 		.num_of_signals = 1,
 		.state_generation_type = CAN_STATE_GENERATION_NON_MULTIPLEXED_BYTE,
@@ -64,31 +67,32 @@ CANDevicePID bcm_pids[] = {
 CANDevicePID sccm_pids[] = {
     {
         .name = "Turn Signals", .short_name = "TS",
+		.device_parent_id = CAN_ID_SCCM,
         .pid_id = {0x71, 0x50},
 		.num_of_signals = 4,
 		.state_generation_type = CAN_STATE_GENERATION_MULTIPLEXED_BYTE,
         .signals = {
             { .name = "Left Turn Signal", .short_name = "LT",
               .change_type = STATE_BIT, .data = 0,
-			  .relevant_data_bytes = 4,
+			  .relevant_data_bytes = 1,
               .state_off  = {0x00, 0x00, 0x00, 0x00},
               .state_on   = {0x01, 0x00, 0x00, 0x00} },
 
             { .name = "Right Turn Signal", .short_name = "RT",
               .change_type = STATE_BIT, .data = 0,
-			  .relevant_data_bytes = 4,
+			  .relevant_data_bytes = 1,
               .state_off  = {0x00, 0x00, 0x00, 0x00},
               .state_on   = {0x02, 0x00, 0x00, 0x00} },
 
             { .name = "Left Lane Change", .short_name = "LC",
               .change_type = STATE_BIT, .data = 0,
-			  .relevant_data_bytes = 4,
+			  .relevant_data_bytes = 2,
               .state_off  = {0x00, 0x00, 0x00, 0x00},
               .state_on   = {0x00, 0x02, 0x00, 0x00} },
 
             { .name = "Right Lane Change", .short_name = "RC",
               .change_type = STATE_BIT, .data = 0,
-			  .relevant_data_bytes = 4,
+			  .relevant_data_bytes = 2,
               .state_off  = {0x00, 0x00, 0x00, 0x00},
               .state_on   = {0x00, 0x04, 0x00, 0x00} },
         }

@@ -169,6 +169,11 @@ void __rtos__StartHID_RxUART_Task(void *pvParameters, HID_UART_Rx_Packet *packet
                         case 0x02: sprintf(signal_name, "Brake Pedal"); break;
                         case 0x03: sprintf(signal_name, "Hazard Button"); break;
                         case 0x04: sprintf(signal_name, "Reverse Light"); break;
+                        case 0x05: sprintf(signal_name, "Left Turn Signal"); break;
+                        case 0x06: sprintf(signal_name, "Left Lane Change"); break;
+                        case 0x07: sprintf(signal_name, "Right Turn Signal"); break;
+                        case 0x08: sprintf(signal_name, "Right Lane Change"); break;
+
                         default:
                             log_message("Unknown button ID: 0x%02X\n", button_id);
                             break;
@@ -176,7 +181,7 @@ void __rtos__StartHID_RxUART_Task(void *pvParameters, HID_UART_Rx_Packet *packet
 
 					signal = get_pid_signal_by_name(signal_name);
 					if (signal != NULL) {
-					  signal->data = (button_val == 0x01 ? 1 : 0);
+					  signal->data = (button_val > 0x00 ? 1 : 0);
 					  log_message("%s state: %s", signal_name, signal->data ? "ON" : "OFF");
 					} else {
 					  log_message("* COULD NOT FIND SIGNAL BY NAME!");

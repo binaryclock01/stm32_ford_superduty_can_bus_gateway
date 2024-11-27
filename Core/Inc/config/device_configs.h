@@ -125,6 +125,7 @@ typedef enum {
 typedef struct {
     const char *name;                     // Name of the PID
     const char *short_name;               // Short name for display
+    const CAN_Ids device_parent_id;			// CAN_ID_BCM, CAN_ID_SCCM, etc.
     uint8_t pid_id[PID_BYTE_LENGTH];       // PID byte data
     uint8_t num_of_signals;					// number of signals used in PID
     CANSignal signals[MAX_SIGNALS_PER_PID]; // Signals associated with this PID
